@@ -102,15 +102,25 @@ Your goals:
 1. Provide the most natural, idiomatic, and contextually accurate ${this.settings.targetLanguage} replacement that fits seamlessly into the sentence's grammar, rhythm, and tone.
 2. CONSTRUCTIVE FLUENCY & NUANCE COACHING:
    - Review the surrounding sentence for any typos (misspellings), unnatural collocations, or phrasing that could be expressed more clearly or idiomatically.
-   - If there is a typo (e.g. "hearth" instead of "heart") or a phrase that would sound significantly more natural (e.g. "do research" instead of "make research"), provide a friendly, concise, and constructive tip in Turkish in the "feedback" field (e.g. "İpucu: Cümledeki 'make research' yerine 'do research' kullanımı daha doğaldır.").
+   - If there is a typo (e.g. "hearth" instead of "heart") or a phrase that would sound significantly more natural (e.g. "do research" instead of "make research"):
+     a) Provide a friendly, concise, and constructive tip in Turkish in the "feedback" field (e.g. "İpucu: Cümledeki 'make research' yerine 'do research' kullanımı daha doğaldır.").
+     b) Populate the "flaggedItem" object with:
+        - "original": the EXACT substring as it appears in the user's sentence (e.g. "hearth" or "make research")
+        - "suggestion": the improved target language word or phrase (e.g. "heart" or "do research")
+        - "reason": concise reason in Turkish (e.g. "Yazım hatası" or "Doğal eşdizim")
+   - If the sentence is already completely natural and error-free, set "feedback" to null and "flaggedItem" to null.
    - Do NOT lecture or moralize about tone or intent. Focus purely on constructive writing polish, clarity, and linguistic nuances.
-   - If the sentence is already completely natural and error-free, set "feedback" to null.
 3. Extract the key vocabulary item (word or collocation phrase) to add to the user's active vocabulary list.
 
 You MUST respond strictly with valid JSON conforming to this schema (no markdown fences, no extra text):
 {
   "replacement": "exact replacement string for inside or including the brackets",
   "feedback": "Optional concise, constructive tip in Turkish about typos, phrasing improvements, or nuance, or null",
+  "flaggedItem": {
+    "original": "exact word or phrase from the sentence that has a typo or unnatural usage",
+    "suggestion": "improved word or phrase",
+    "reason": "kısa açıklama (örn: Yazım hatası veya Doğal eşdizim)"
+  },
   "vocabItem": {
     "term": "the key target language word or idiom",
     "definition": "Türkçe anlamı ve kullanım notu",
@@ -175,6 +185,17 @@ Provide the natural replacement to substitute the bracketed text directly.`;
     }
 
     parsed.feedback = parsed.feedback || parsed.warning || null;
+    if (parsed.flaggedItem) {
+      if (
+        typeof parsed.flaggedItem !== "object" ||
+        !parsed.flaggedItem.original ||
+        !parsed.flaggedItem.suggestion
+      ) {
+        parsed.flaggedItem = null;
+      }
+    } else {
+      parsed.flaggedItem = null;
+    }
     return parsed;
   }
 }

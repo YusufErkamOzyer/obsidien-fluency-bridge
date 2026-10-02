@@ -4,6 +4,7 @@ import { FluencyBridgeSettingTab } from "./settings";
 import { LLMClient } from "./llm/client";
 import { ContextParser } from "./services/contextParser";
 import { VocabularyManager } from "./services/vocabulary";
+import { HighlightManager } from "./services/highlightManager";
 
 export default class FluencyBridgePlugin extends Plugin {
   settings: FluencyBridgeSettings = DEFAULT_SETTINGS;
@@ -34,7 +35,22 @@ export default class FluencyBridgePlugin extends Plugin {
       ],
     });
 
-    console.log("[Fluency Bridge] Eklenti başarıyla yüklendi.");
+    // Register Command to Clear Highlights
+    this.addCommand({
+      id: "clear-fluency-highlights",
+      name: "Clear Fluency Highlights in Active Note (Aktif Nottaki Vurguları Temizle)",
+      editorCallback: (editor: Editor, _ctx: MarkdownView | MarkdownFileInfo) => {
+        this.handleClearHighlights(editor);
+      },
+      hotkeys: [
+        {
+          modifiers: ["Mod", "Shift"],
+          key: "H",
+        },
+      ],
+    });
+
+    console.log("[Fluency Bridge v0.2.0] Eklenti başarıyla yüklendi.");
   }
 
   onunload() {
@@ -88,19 +104,8 @@ export default class FluencyBridgePlugin extends Plugin {
         return;
       }
 
-      // Replace the text inside the editor
-      editor.replaceRange(
-        result.replacement,
-        target.replaceRange.from,
-        target.replaceRange.to
-      );
-
-      // Position the cursor at the end of the newly inserted text
-      const newCursorCh = target.replaceRange.from.ch + result.replacement.length;
-      editor.setCursor({
-        line: target.replaceRange.from.line,
-        ch: newCursorCh,
-      });
+      // Apply the formatted replacement and nuance highlights to the active editor
+      HighlightManager.applyToEditor(editor, target, result, this.settings);
 
       // Show Fluency & Nuance feedback tip if provided
       const tip = result.feedback || result.warning;
@@ -120,6 +125,18 @@ export default class FluencyBridgePlugin extends Plugin {
       const errorMsg = err instanceof Error ? err.message : String(err);
       new Notice(`Fluency Bridge Hatası: ${errorMsg}`, 7000);
       console.error("[Fluency Bridge Error]", err);
+    }
+  }
+
+  private handleClearHighlights(editor: Editor) {
+    const content = editor.getValue();
+    const { cleaned, count } = HighlightManager.stripHighlights(content);
+
+    if (count > 0) {
+      editor.setValue(cleaned);
+      new Notice(`✓ Fluency Bridge: ${count} adet vurgulama temizlendi.`, 3000);
+    } else {
+      new Notice("Fluency Bridge: Temizlenecek vurgulama bulunamadı.", 3000);
     }
   }
 }

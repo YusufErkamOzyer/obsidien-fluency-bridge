@@ -34,18 +34,22 @@ var import_obsidian3 = require("obsidian");
 var DEFAULT_SETTINGS = {
   provider: "groq",
   apiKey: "",
-  model: "openai/gpt-oss-120b",
+  model: "llama-3.3-70b-versatile",
   customEndpoint: "https://api.groq.com/openai/v1/chat/completions",
   vocabularyPath: "Vocabulary.md",
   autoLogVocabulary: true,
+  enableSlangAlerts: true,
   enableNuanceTips: true,
   nativeLanguage: "Turkish",
-  targetLanguage: "English"
+  targetLanguage: "English",
+  highlightStyle: "html",
+  highlightReplacedText: true,
+  highlightFlaggedNuances: true
 };
 var PROVIDER_DEFAULTS = {
   groq: {
     endpoint: "https://api.groq.com/openai/v1/chat/completions",
-    defaultModel: "openai/gpt-oss-120b",
+    defaultModel: "llama-3.3-70b-versatile",
     placeholderKey: "gsk_..."
   },
   gemini: {
@@ -98,7 +102,7 @@ var FluencyBridgeSettingTab = class extends import_obsidian.PluginSettingTab {
       });
       text.inputEl.type = "password";
     });
-    const modelDesc = this.plugin.settings.provider === "groq" ? "Kullan\u0131lacak model ID. Groq i\xE7in: openai/gpt-oss-120b (\xD6nerilen/Ak\u0131ll\u0131) veya qwen/qwen3.8-27b (Ultra H\u0131zl\u0131 - 70ms)" : "Kullan\u0131lacak model kimli\u011Fi (ID).";
+    const modelDesc = this.plugin.settings.provider === "groq" ? "Kullan\u0131lacak model ID. Groq i\xE7in: llama-3.3-70b-versatile (\xD6nerilen/Ak\u0131ll\u0131) veya qwen/qwen3.8-27b (Ultra H\u0131zl\u0131)" : "Kullan\u0131lacak model kimli\u011Fi (ID).";
     new import_obsidian.Setting(containerEl).setName("Model Ad\u0131").setDesc(modelDesc).addText((text) => {
       text.setPlaceholder(providerDef.defaultModel).setValue(this.plugin.settings.model).onChange(async (val) => {
         this.plugin.settings.model = val.trim();
@@ -127,6 +131,25 @@ var FluencyBridgeSettingTab = class extends import_obsidian.PluginSettingTab {
         }
       });
     });
+    containerEl.createEl("h3", { text: "Metin \u0130\xE7i Vurgulama & Renklendirme" });
+    new import_obsidian.Setting(containerEl).setName("Vurgulama Y\xF6ntemi (Highlight Style)").setDesc("D\xFCzeltilen yerlerin ve ipucu verilen kelimelerin nas\u0131l g\xF6sterilece\u011Fini belirleyin.").addDropdown((dropdown) => {
+      dropdown.addOption("html", "\u{1F3A8} Renkli HTML \u0130\u015Faretleme (<mark> - Tooltip Destekli)").addOption("markdown", "\u270F\uFE0F Standart Markdown (==vurgu==)").addOption("none", "\u{1F6AB} Vurgusuz (Do\u011Frudan D\xFCz Metin)").setValue(this.plugin.settings.highlightStyle || "html").onChange(async (val) => {
+        this.plugin.settings.highlightStyle = val;
+        await this.plugin.saveSettings();
+      });
+    });
+    new import_obsidian.Setting(containerEl).setName("\xC7evrilen \u0130fadeyi Renklendir").setDesc("K\xF6\u015Feli parantezden d\xF6n\xFC\u015Ft\xFCr\xFClen hedef kelime/ifadeyi renkli olarak i\u015Faretle (hover ile orijinal T\xFCrk\xE7e ifade g\xF6r\xFCn\xFCr).").addToggle((toggle) => {
+      toggle.setValue(this.plugin.settings.highlightReplacedText).onChange(async (val) => {
+        this.plugin.settings.highlightReplacedText = val;
+        await this.plugin.saveSettings();
+      });
+    });
+    new import_obsidian.Setting(containerEl).setName("Uyar\u0131 & \u0130pucu Alan Kelimeleri \u0130\u015Faretle").setDesc("C\xFCmledeki yaz\u0131m hatalar\u0131 veya do\u011Fall\u0131k uyar\u0131s\u0131 alan kelimeleri dalgal\u0131 alt \xE7izgi ile i\u015Faretle (hover ile \xF6neri g\xF6r\xFCn\xFCr).").addToggle((toggle) => {
+      toggle.setValue(this.plugin.settings.highlightFlaggedNuances).onChange(async (val) => {
+        this.plugin.settings.highlightFlaggedNuances = val;
+        await this.plugin.saveSettings();
+      });
+    });
     containerEl.createEl("h3", { text: "Kelime Kasas\u0131 & Uyar\u0131lar" });
     new import_obsidian.Setting(containerEl).setName("Kelime Kasas\u0131 Dosyas\u0131 (Vocabulary Path)").setDesc("\xC7evrilen ve \xF6\u011Frenilen kelimelerin otomatik eklenece\u011Fi markdown dosyas\u0131.").addText((text) => {
       text.setPlaceholder("Vocabulary.md").setValue(this.plugin.settings.vocabularyPath).onChange(async (val) => {
@@ -141,7 +164,7 @@ var FluencyBridgeSettingTab = class extends import_obsidian.PluginSettingTab {
       });
     });
     new import_obsidian.Setting(containerEl).setName("Yaz\u0131m ve Do\u011Fall\u0131k \xD6nerileri (Fluency & Nuance Tips)").setDesc("C\xFCmlenizdeki olas\u0131 yaz\u0131m hatalar\u0131 (typo), daha do\u011Fal alternatif ifadeler ve ba\u011Flamsal n\xFCanslar hakk\u0131nda yap\u0131c\u0131 ipu\xE7lar\u0131 g\xF6ster.").addToggle((toggle) => {
-      toggle.setValue(this.plugin.settings.enableNuanceTips).onChange(async (val) => {
+      toggle.setValue(this.plugin.settings.enableNuanceTips ?? true).onChange(async (val) => {
         this.plugin.settings.enableNuanceTips = val;
         this.plugin.settings.enableSlangAlerts = val;
         await this.plugin.saveSettings();
@@ -235,15 +258,25 @@ Your goals:
 1. Provide the most natural, idiomatic, and contextually accurate ${this.settings.targetLanguage} replacement that fits seamlessly into the sentence's grammar, rhythm, and tone.
 2. CONSTRUCTIVE FLUENCY & NUANCE COACHING:
    - Review the surrounding sentence for any typos (misspellings), unnatural collocations, or phrasing that could be expressed more clearly or idiomatically.
-   - If there is a typo (e.g. "hearth" instead of "heart") or a phrase that would sound significantly more natural (e.g. "do research" instead of "make research"), provide a friendly, concise, and constructive tip in Turkish in the "feedback" field (e.g. "\u0130pucu: C\xFCmledeki 'make research' yerine 'do research' kullan\u0131m\u0131 daha do\u011Fald\u0131r.").
+   - If there is a typo (e.g. "hearth" instead of "heart") or a phrase that would sound significantly more natural (e.g. "do research" instead of "make research"):
+     a) Provide a friendly, concise, and constructive tip in Turkish in the "feedback" field (e.g. "\u0130pucu: C\xFCmledeki 'make research' yerine 'do research' kullan\u0131m\u0131 daha do\u011Fald\u0131r.").
+     b) Populate the "flaggedItem" object with:
+        - "original": the EXACT substring as it appears in the user's sentence (e.g. "hearth" or "make research")
+        - "suggestion": the improved target language word or phrase (e.g. "heart" or "do research")
+        - "reason": concise reason in Turkish (e.g. "Yaz\u0131m hatas\u0131" or "Do\u011Fal e\u015Fdizim")
+   - If the sentence is already completely natural and error-free, set "feedback" to null and "flaggedItem" to null.
    - Do NOT lecture or moralize about tone or intent. Focus purely on constructive writing polish, clarity, and linguistic nuances.
-   - If the sentence is already completely natural and error-free, set "feedback" to null.
 3. Extract the key vocabulary item (word or collocation phrase) to add to the user's active vocabulary list.
 
 You MUST respond strictly with valid JSON conforming to this schema (no markdown fences, no extra text):
 {
   "replacement": "exact replacement string for inside or including the brackets",
   "feedback": "Optional concise, constructive tip in Turkish about typos, phrasing improvements, or nuance, or null",
+  "flaggedItem": {
+    "original": "exact word or phrase from the sentence that has a typo or unnatural usage",
+    "suggestion": "improved word or phrase",
+    "reason": "k\u0131sa a\xE7\u0131klama (\xF6rn: Yaz\u0131m hatas\u0131 veya Do\u011Fal e\u015Fdizim)"
+  },
   "vocabItem": {
     "term": "the key target language word or idiom",
     "definition": "T\xFCrk\xE7e anlam\u0131 ve kullan\u0131m notu",
@@ -296,6 +329,13 @@ Provide the natural replacement to substitute the bracketed text directly.`;
       parsed = JSON.parse(cleaned);
     }
     parsed.feedback = parsed.feedback || parsed.warning || null;
+    if (parsed.flaggedItem) {
+      if (typeof parsed.flaggedItem !== "object" || !parsed.flaggedItem.original || !parsed.flaggedItem.suggestion) {
+        parsed.flaggedItem = null;
+      }
+    } else {
+      parsed.flaggedItem = null;
+    }
     return parsed;
   }
 };
@@ -407,6 +447,177 @@ Otomatik olu\u015Fturulan aktif kelime ve deyimler listesi.
   }
 };
 
+// src/services/highlightManager.ts
+var HighlightManager = class {
+  /**
+   * Safely escapes HTML special characters to prevent attribute and content corruption.
+   */
+  static escapeHtml(text) {
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  }
+  /**
+   * Escapes special characters for RegExp matching.
+   */
+  static escapeRegex(text) {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+  /**
+   * Formats the replaced expression according to selected highlight style.
+   */
+  static formatReplacement(replacement, rawOriginal, style, enabled) {
+    if (!enabled || style === "none") {
+      return replacement;
+    }
+    if (style === "html") {
+      const tooltip = `Orijinal: [${this.escapeHtml(rawOriginal)}]`;
+      return `<mark class="fb-highlight fb-replaced" title="${tooltip}">${this.escapeHtml(replacement)}</mark>`;
+    }
+    if (style === "markdown") {
+      return `==${replacement}==`;
+    }
+    return replacement;
+  }
+  /**
+   * Formats a flagged nuance or typo word according to selected highlight style.
+   */
+  static formatNuance(word, suggestion, reason, style) {
+    if (style === "html") {
+      const tooltip = `\u{1F4A1} \xD6neri: ${this.escapeHtml(suggestion)} (${this.escapeHtml(reason || "\u0130pucu")})`;
+      return `<mark class="fb-highlight fb-nuance" title="${tooltip}">${this.escapeHtml(word)}</mark>`;
+    }
+    if (style === "markdown") {
+      return `==${word}==`;
+    }
+    return word;
+  }
+  /**
+   * Searches for a word or phrase in text that is NOT located inside existing HTML tags.
+   */
+  static findMatchOutsideTags(text, word) {
+    if (!word || !word.trim()) return null;
+    const escaped = this.escapeRegex(word.trim());
+    const tagRegex = /<[^>]+>/g;
+    const tagSpans = [];
+    let tagMatch;
+    while ((tagMatch = tagRegex.exec(text)) !== null) {
+      tagSpans.push({
+        start: tagMatch.index,
+        end: tagMatch.index + tagMatch[0].length
+      });
+    }
+    const checkMatch = (pattern) => {
+      let m;
+      while ((m = pattern.exec(text)) !== null) {
+        const mStart = m.index;
+        const mEnd = mStart + m[0].length;
+        const isInsideTag = tagSpans.some(
+          (span) => mStart < span.end && mEnd > span.start
+        );
+        if (!isInsideTag) {
+          return m;
+        }
+      }
+      return null;
+    };
+    const wordBoundaryPattern = new RegExp(`\\b${escaped}\\b`, "gi");
+    const wbMatch = checkMatch(wordBoundaryPattern);
+    if (wbMatch) return wbMatch;
+    const fallbackPattern = new RegExp(escaped, "gi");
+    return checkMatch(fallbackPattern);
+  }
+  /**
+   * Replaces the first occurrence of flagged word in text with the formatted nuance highlight.
+   */
+  static highlightNuanceInString(text, flagged, style) {
+    if (!flagged.original || !flagged.original.trim()) {
+      return { updatedText: text, matched: false };
+    }
+    const match = this.findMatchOutsideTags(text, flagged.original);
+    if (!match || match.index === void 0) {
+      return { updatedText: text, matched: false };
+    }
+    const matchedStr = match[0];
+    const start = match.index;
+    const end = start + matchedStr.length;
+    const formatted = this.formatNuance(
+      matchedStr,
+      flagged.suggestion,
+      flagged.reason,
+      style
+    );
+    const updatedText = text.slice(0, start) + formatted + text.slice(end);
+    return { updatedText, matched: true };
+  }
+  /**
+   * Applies the translation and optional nuance highlighting cleanly to the active editor.
+   */
+  static applyToEditor(editor, target, result, settings) {
+    const isSingleLine = target.replaceRange.from.line === target.replaceRange.to.line;
+    const style = settings.highlightStyle || "html";
+    const highlightReplaced = settings.highlightReplacedText ?? true;
+    const highlightNuance = settings.highlightFlaggedNuances ?? true;
+    const formattedReplacement = this.formatReplacement(
+      result.replacement,
+      target.rawExpression,
+      style,
+      highlightReplaced
+    );
+    if (isSingleLine) {
+      const lineNum = target.replaceRange.from.line;
+      const lineText = editor.getLine(lineNum);
+      const fromCh = target.replaceRange.from.ch;
+      const toCh = target.replaceRange.to.ch;
+      let prefix = lineText.slice(0, fromCh);
+      let suffix = lineText.slice(toCh);
+      if (highlightNuance && result.flaggedItem && style !== "none") {
+        const prefixRes = this.highlightNuanceInString(
+          prefix,
+          result.flaggedItem,
+          style
+        );
+        if (prefixRes.matched) {
+          prefix = prefixRes.updatedText;
+        } else {
+          const suffixRes = this.highlightNuanceInString(
+            suffix,
+            result.flaggedItem,
+            style
+          );
+          if (suffixRes.matched) {
+            suffix = suffixRes.updatedText;
+          }
+        }
+      }
+      const newLine = prefix + formattedReplacement + suffix;
+      editor.setLine(lineNum, newLine);
+      const cursorCh = prefix.length + formattedReplacement.length;
+      editor.setCursor({ line: lineNum, ch: cursorCh });
+      return { cursorCh, line: lineNum };
+    } else {
+      editor.replaceRange(
+        formattedReplacement,
+        target.replaceRange.from,
+        target.replaceRange.to
+      );
+      const cursorCh = target.replaceRange.from.ch + formattedReplacement.length;
+      editor.setCursor({ line: target.replaceRange.from.line, ch: cursorCh });
+      return { cursorCh, line: target.replaceRange.from.line };
+    }
+  }
+  /**
+   * Strips all Fluency Bridge highlight marks (<mark class="...fb-...">) from a given string.
+   */
+  static stripHighlights(content) {
+    const regex = /<mark\s+class="[^"]*fb-(?:highlight|replaced|nuance)[^"]*"[^>]*>([\s\S]*?)<\/mark>/gi;
+    let count = 0;
+    const cleaned = content.replace(regex, (_match, group1) => {
+      count++;
+      return group1;
+    });
+    return { cleaned, count };
+  }
+};
+
 // src/main.ts
 var FluencyBridgePlugin = class extends import_obsidian3.Plugin {
   settings = DEFAULT_SETTINGS;
@@ -430,7 +641,20 @@ var FluencyBridgePlugin = class extends import_obsidian3.Plugin {
         }
       ]
     });
-    console.log("[Fluency Bridge] Eklenti ba\u015Far\u0131yla y\xFCklendi.");
+    this.addCommand({
+      id: "clear-fluency-highlights",
+      name: "Clear Fluency Highlights in Active Note (Aktif Nottaki Vurgular\u0131 Temizle)",
+      editorCallback: (editor, _ctx) => {
+        this.handleClearHighlights(editor);
+      },
+      hotkeys: [
+        {
+          modifiers: ["Mod", "Shift"],
+          key: "H"
+        }
+      ]
+    });
+    console.log("[Fluency Bridge v0.2.0] Eklenti ba\u015Far\u0131yla y\xFCklendi.");
   }
   onunload() {
     console.log("[Fluency Bridge] Eklenti devreden \xE7\u0131kar\u0131ld\u0131.");
@@ -474,16 +698,7 @@ var FluencyBridgePlugin = class extends import_obsidian3.Plugin {
         new import_obsidian3.Notice("Fluency Bridge: Modelden ge\xE7erli bir kar\u015F\u0131l\u0131k al\u0131namad\u0131.", 4e3);
         return;
       }
-      editor.replaceRange(
-        result.replacement,
-        target.replaceRange.from,
-        target.replaceRange.to
-      );
-      const newCursorCh = target.replaceRange.from.ch + result.replacement.length;
-      editor.setCursor({
-        line: target.replaceRange.from.line,
-        ch: newCursorCh
-      });
+      HighlightManager.applyToEditor(editor, target, result, this.settings);
       const tip = result.feedback || result.warning;
       const enableTips = this.settings.enableNuanceTips ?? this.settings.enableSlangAlerts ?? true;
       if (enableTips && tip) {
@@ -499,6 +714,16 @@ var FluencyBridgePlugin = class extends import_obsidian3.Plugin {
       const errorMsg = err instanceof Error ? err.message : String(err);
       new import_obsidian3.Notice(`Fluency Bridge Hatas\u0131: ${errorMsg}`, 7e3);
       console.error("[Fluency Bridge Error]", err);
+    }
+  }
+  handleClearHighlights(editor) {
+    const content = editor.getValue();
+    const { cleaned, count } = HighlightManager.stripHighlights(content);
+    if (count > 0) {
+      editor.setValue(cleaned);
+      new import_obsidian3.Notice(`\u2713 Fluency Bridge: ${count} adet vurgulama temizlendi.`, 3e3);
+    } else {
+      new import_obsidian3.Notice("Fluency Bridge: Temizlenecek vurgulama bulunamad\u0131.", 3e3);
     }
   }
 };

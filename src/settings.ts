@@ -1,6 +1,6 @@
 import { App, PluginSettingTab, Setting, Notice } from "obsidian";
 import FluencyBridgePlugin from "./main";
-import { LLMProvider, PROVIDER_DEFAULTS } from "./types";
+import { HighlightStyle, LLMProvider, PROVIDER_DEFAULTS } from "./types";
 
 export class FluencyBridgeSettingTab extends PluginSettingTab {
   plugin: FluencyBridgePlugin;
@@ -59,7 +59,7 @@ export class FluencyBridgeSettingTab extends PluginSettingTab {
     // 3. Model Name
     const modelDesc =
       this.plugin.settings.provider === "groq"
-        ? "Kullanılacak model ID. Groq için: openai/gpt-oss-120b (Önerilen/Akıllı) veya qwen/qwen3.8-27b (Ultra Hızlı - 70ms)"
+        ? "Kullanılacak model ID. Groq için: llama-3.3-70b-versatile (Önerilen/Akıllı) veya qwen/qwen3.8-27b (Ultra Hızlı)"
         : "Kullanılacak model kimliği (ID).";
 
     new Setting(containerEl)
@@ -114,9 +114,53 @@ export class FluencyBridgeSettingTab extends PluginSettingTab {
           });
       });
 
+    containerEl.createEl("h3", { text: "Metin İçi Vurgulama & Renklendirme" });
+
+    // 6. Highlight Style
+    new Setting(containerEl)
+      .setName("Vurgulama Yöntemi (Highlight Style)")
+      .setDesc("Düzeltilen yerlerin ve ipucu verilen kelimelerin nasıl gösterileceğini belirleyin.")
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption("html", "🎨 Renkli HTML İşaretleme (<mark> - Tooltip Destekli)")
+          .addOption("markdown", "✏️ Standart Markdown (==vurgu==)")
+          .addOption("none", "🚫 Vurgusuz (Doğrudan Düz Metin)")
+          .setValue(this.plugin.settings.highlightStyle || "html")
+          .onChange(async (val) => {
+            this.plugin.settings.highlightStyle = val as HighlightStyle;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    // 7. Highlight Replaced Text
+    new Setting(containerEl)
+      .setName("Çevrilen İfadeyi Renklendir")
+      .setDesc("Köşeli parantezden dönüştürülen hedef kelime/ifadeyi renkli olarak işaretle (hover ile orijinal Türkçe ifade görünür).")
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.highlightReplacedText)
+          .onChange(async (val) => {
+            this.plugin.settings.highlightReplacedText = val;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    // 8. Highlight Flagged Nuances
+    new Setting(containerEl)
+      .setName("Uyarı & İpucu Alan Kelimeleri İşaretle")
+      .setDesc("Cümledeki yazım hataları veya doğallık uyarısı alan kelimeleri dalgalı alt çizgi ile işaretle (hover ile öneri görünür).")
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.highlightFlaggedNuances)
+          .onChange(async (val) => {
+            this.plugin.settings.highlightFlaggedNuances = val;
+            await this.plugin.saveSettings();
+          });
+      });
+
     containerEl.createEl("h3", { text: "Kelime Kasası & Uyarılar" });
 
-    // 6. Vocabulary Path
+    // 9. Vocabulary Path
     new Setting(containerEl)
       .setName("Kelime Kasası Dosyası (Vocabulary Path)")
       .setDesc("Çevrilen ve öğrenilen kelimelerin otomatik ekleneceği markdown dosyası.")
@@ -130,7 +174,7 @@ export class FluencyBridgeSettingTab extends PluginSettingTab {
           });
       });
 
-    // 7. Auto Log Toggle
+    // 10. Auto Log Toggle
     new Setting(containerEl)
       .setName("Kelimeyi Otomatik Kaydet")
       .setDesc("Değiştirilen her deyim ve kelimeyi otomatik olarak kelime kütüğüne tablo olarak ekle.")
@@ -143,13 +187,13 @@ export class FluencyBridgeSettingTab extends PluginSettingTab {
           });
       });
 
-    // 8. Fluency & Nuance Tips
+    // 11. Fluency & Nuance Tips
     new Setting(containerEl)
       .setName("Yazım ve Doğallık Önerileri (Fluency & Nuance Tips)")
       .setDesc("Cümlenizdeki olası yazım hataları (typo), daha doğal alternatif ifadeler ve bağlamsal nüanslar hakkında yapıcı ipuçları göster.")
       .addToggle((toggle) => {
         toggle
-          .setValue(this.plugin.settings.enableNuanceTips)
+          .setValue(this.plugin.settings.enableNuanceTips ?? true)
           .onChange(async (val) => {
             this.plugin.settings.enableNuanceTips = val;
             this.plugin.settings.enableSlangAlerts = val;

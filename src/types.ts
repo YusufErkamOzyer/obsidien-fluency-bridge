@@ -1,5 +1,13 @@
 export type LLMProvider = "groq" | "gemini" | "openrouter" | "custom";
 
+export type HighlightStyle = "html" | "markdown" | "none";
+
+export interface FlaggedItem {
+  original: string;
+  suggestion: string;
+  reason: string;
+}
+
 export interface FluencyBridgeSettings {
   provider: LLMProvider;
   apiKey: string;
@@ -8,8 +16,12 @@ export interface FluencyBridgeSettings {
   vocabularyPath: string;
   autoLogVocabulary: boolean;
   enableSlangAlerts: boolean;
+  enableNuanceTips: boolean;
   nativeLanguage: string;
   targetLanguage: string;
+  highlightStyle: HighlightStyle;
+  highlightReplacedText: boolean;
+  highlightFlaggedNuances: boolean;
 }
 
 export const DEFAULT_SETTINGS: FluencyBridgeSettings = {
@@ -20,8 +32,12 @@ export const DEFAULT_SETTINGS: FluencyBridgeSettings = {
   vocabularyPath: "Vocabulary.md",
   autoLogVocabulary: true,
   enableSlangAlerts: true,
+  enableNuanceTips: true,
   nativeLanguage: "Turkish",
   targetLanguage: "English",
+  highlightStyle: "html",
+  highlightReplacedText: true,
+  highlightFlaggedNuances: true,
 };
 
 export const PROVIDER_DEFAULTS: Record<
@@ -61,7 +77,9 @@ export interface ExtractedTarget {
 
 export interface TranslationResult {
   replacement: string;
+  feedback?: string | null;
   warning?: string | null;
+  flaggedItem?: FlaggedItem | null;
   vocabItem?: {
     term: string;
     definition: string;
