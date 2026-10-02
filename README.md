@@ -7,11 +7,12 @@
 ## ⚡ Neden Fluency Bridge?
 
 1. **Yazma Akışını (Flow State) Bozmaz:** Tarayıcıya veya sözlüğe geçmeden, cümlenizin ortasında `[takıldığınız Türkçe ifadeyi]` yazıp `Cmd + Shift + E` kısayoluna basmanız yeterlidir. Cümle bağlamına en uygun doğal İngilizce ifade yerinde değiştirilir.
-2. **🎨 Görsel Renkli Vurgulama (v0.2):**
-   - **Düzeltilen Çeviriler (`.fb-replaced`):** Çevrilen yerler sakin mavi/yeşil bir vurgu alır. Bilgisayar başından ayrılsanız bile döndüğünüzde neyin değiştiğini hemen fark edersiniz. Fareyle üzerine geldiğinizde (hover tooltip) orijinal Türkçe ifade gösterilir (`Orijinal: [ifade]`).
-   - **Hata & Nüans Uyarıları (`.fb-nuance`):** Cümledeki yazım hataları (typo) veya daha doğal eşdizimler (örn: *make research* yerine *do research*) kehribar rengi dalgalı alt çizgi ile işaretlenir. Üzerine gelindiğinde yapıcı ipucu ve önerilen alternatif görüntülenir.
-   - **Tek Tuşla Temizleme (`Cmd + Shift + H`):** Notunuzu tamamladığınızda tek bir komutla tüm vurgulamaları kaldırıp temiz Markdown metnine dönebilirsiniz.
-3. **Yazım ve Doğallık Önerileri (Fluency & Nuance Tips):** Cümlenizdeki olası yazım hatalarını ve bağlamsal nüansları dostça bir bildirim ve cümle içi işaretleme ile sunar.
+2. **✨ Doğal Editör Vurgulaması (CodeMirror 6 Decorations - v0.2):**
+   - **Sıfır HTML Etiketi / %100 Temiz Markdown:** Markdown dosyanıza hiçbir yabancı `<mark>` veya HTML etiketi **eklenmez**. Metniniz her zaman saf ve pürüzsüz kalır.
+   - **Düzeltilen Çeviriler (`.fb-replaced`):** Çevrilen yerler editör üzerinde anında sakin mavi/turkuaz bir vurgu alır. Bilgisayar başından ayrılsanız bile döndüğünüzde neyin değiştiğini hemen fark edersiniz. Fareyle üzerine geldiğinizde (hover tooltip) orijinal Türkçe ifade gösterilir (`Orijinal: [ifade]`).
+   - **Hata & Nüans Uyarıları (`.fb-nuance`):** Cümledeki yazım hataları (typo) veya daha doğal eşdizimler (örn: *make research* yerine *do research*) kehribar rengi dalgalı alt çizgi ile editörde işaretlenir. Üzerine gelindiğinde yapıcı ipucu ve önerilen alternatif görüntülenir.
+   - **Tek Tuşla Temizleme (`Cmd + Shift + H`):** İstediğiniz an tek bir komutla tüm görsel vurgulamaları kaldırabilirsiniz.
+3. **Yazım ve Doğallık Önerileri (Fluency & Nuance Tips):** Cümlenizdeki olası yazım hatalarını ve bağlamsal nüansları dostça bir bildirim ve görsel alt çizgi ile sunar.
 4. **Otomatik Kelime Kasası (Active Vocabulary Deck):** Değiştirilen her deyim ve kelime, kasanızdaki `Vocabulary.md` dosyasına cümlenin bağlamı ve Türkçe notuyla birlikte otomatik tablo satırı olarak işlenir.
 
 ---
@@ -32,10 +33,11 @@
 1. Notunuzda normal cümlenizi yazarken aklınıza gelmeyen ifadeyi köşeli parantez içine alın:
    > *"I want to [araştırma yapmak] because my hearth is weak."*
 2. İmleç cümlenin üzerindeyken **`Cmd + Shift + E`** (Windows'ta `Ctrl + Shift + E`) tuşlarına basın.
-3. Saniyeler içinde cümleniz hem dönüştürülür hem de renklendirilir:
-   - `[araştırma yapmak]` ➔ `<mark class="fb-highlight fb-replaced">conduct research</mark>` (üzerine gelince `Orijinal: [araştırma yapmak]` görünür).
-   - `hearth` ➔ `<mark class="fb-highlight fb-nuance">hearth</mark>` (üzerine gelince `💡 Öneri: heart (Yazım hatası)` görünür).
-4. Yazınızı bitirdiğinizde **`Cmd + Shift + H`** (veya Command Palette -> *Clear Fluency Highlights*) çalıştırarak tüm etiketleri temizleyip pürüzsüz metne dönebilirsiniz!
+3. Saniyeler içinde cümleniz pürüzsüz metin olarak dönüştürülür:
+   - Metin dosyanız: *"I want to conduct research because my hearth is weak."* (Tertemiz, HTML yok!)
+   - Editörde: `conduct research` sakin maviyle vurgulanır, `hearth` dalgalı alt çizgi alır.
+   - Fareyle kelimelerin üzerine gelince ipucu ve orijinal ifade açılır.
+4. Vurgulamaları kaldırmak isterseniz **`Cmd + Shift + H`** tuşlarına basmanız yeterlidir.
 
 ---
 

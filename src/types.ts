@@ -1,6 +1,6 @@
 export type LLMProvider = "groq" | "gemini" | "openrouter" | "custom";
 
-export type HighlightStyle = "html" | "markdown" | "none";
+export type HighlightStyle = "decorations" | "markdown" | "none";
 
 export interface FlaggedItem {
   original: string;
@@ -35,7 +35,7 @@ export const DEFAULT_SETTINGS: FluencyBridgeSettings = {
   enableNuanceTips: true,
   nativeLanguage: "Turkish",
   targetLanguage: "English",
-  highlightStyle: "html",
+  highlightStyle: "decorations",
   highlightReplacedText: true,
   highlightFlaggedNuances: true,
 };

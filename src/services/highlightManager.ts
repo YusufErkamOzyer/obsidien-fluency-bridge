@@ -1,156 +1,124 @@
+import { StateField, StateEffect } from "@codemirror/state";
+import { Decoration, DecorationSet, EditorView } from "@codemirror/view";
 import { Editor } from "obsidian";
 import {
   ExtractedTarget,
-  FlaggedItem,
   FluencyBridgeSettings,
-  HighlightStyle,
   TranslationResult,
 } from "../types";
 
-export class HighlightManager {
-  /**
-   * Safely escapes HTML special characters to prevent attribute and content corruption.
-   */
-  static escapeHtml(text: string): string {
-    return text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
+export interface FluencyDecorationSpec {
+  from: number;
+  to: number;
+  type: "replaced" | "nuance";
+  tooltip: string;
+}
 
-  /**
-   * Escapes special characters for RegExp matching.
-   */
+export const addFluencyDecorations = StateEffect.define<FluencyDecorationSpec[]>();
+export const clearFluencyDecorations = StateEffect.define<void>();
+
+/**
+ * CodeMirror 6 Editor Extension:
+ * Applies visual styling and hover tooltips directly in the editor DOM without adding
+ * any HTML tags or characters into the underlying Markdown file.
+ */
+export const fluencyHighlightField = StateField.define<DecorationSet>({
+  create() {
+    return Decoration.none;
+  },
+  update(decorations, tr) {
+    // Automatically adjust ranges as user types or modifies text
+    decorations = decorations.map(tr.changes);
+
+    for (const effect of tr.effects) {
+      if (effect.is(addFluencyDecorations)) {
+        const marks = effect.value.map((spec) =>
+          Decoration.mark({
+            class: `fb-highlight fb-${spec.type}`,
+            attributes: {
+              title: spec.tooltip,
+            },
+          }).range(spec.from, spec.to)
+        );
+
+        decorations = decorations.update({
+          add: marks,
+          sort: true,
+        });
+      } else if (effect.is(clearFluencyDecorations)) {
+        decorations = Decoration.none;
+      }
+    }
+
+    return decorations;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
+/**
+ * Safely extracts the CodeMirror 6 EditorView instance from an Obsidian Editor.
+ */
+export function getEditorView(editor: Editor): EditorView | null {
+  if (!editor) return null;
+  if ((editor as any).cm instanceof EditorView) {
+    return (editor as any).cm;
+  }
+  if ((editor as any).editor?.cm instanceof EditorView) {
+    return (editor as any).editor.cm;
+  }
+  if ((editor as any).cm && typeof (editor as any).cm.dispatch === "function") {
+    return (editor as any).cm as EditorView;
+  }
+  return null;
+}
+
+export class HighlightManager {
   static escapeRegex(text: string): string {
     return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
   /**
-   * Formats the replaced expression according to selected highlight style.
+   * Searches for a target word/phrase on a given line while avoiding specified character spans.
    */
-  static formatReplacement(
-    replacement: string,
-    rawOriginal: string,
-    style: HighlightStyle,
-    enabled: boolean
-  ): string {
-    if (!enabled || style === "none") {
-      return replacement;
-    }
-
-    if (style === "html") {
-      const tooltip = `Orijinal: [${this.escapeHtml(rawOriginal)}]`;
-      return `<mark class="fb-highlight fb-replaced" title="${tooltip}">${this.escapeHtml(replacement)}</mark>`;
-    }
-
-    if (style === "markdown") {
-      return `==${replacement}==`;
-    }
-
-    return replacement;
-  }
-
-  /**
-   * Formats a flagged nuance or typo word according to selected highlight style.
-   */
-  static formatNuance(
+  static findWordInLine(
+    lineText: string,
     word: string,
-    suggestion: string,
-    reason: string,
-    style: HighlightStyle
-  ): string {
-    if (style === "html") {
-      const tooltip = `💡 Öneri: ${this.escapeHtml(suggestion)} (${this.escapeHtml(reason || "İpucu")})`;
-      return `<mark class="fb-highlight fb-nuance" title="${tooltip}">${this.escapeHtml(word)}</mark>`;
-    }
-
-    if (style === "markdown") {
-      return `==${word}==`;
-    }
-
-    return word;
-  }
-
-  /**
-   * Searches for a word or phrase in text that is NOT located inside existing HTML tags.
-   */
-  static findMatchOutsideTags(text: string, word: string): RegExpExecArray | null {
+    options?: { excludeRange?: { start: number; end: number } }
+  ): { start: number; end: number } | null {
     if (!word || !word.trim()) return null;
 
-    const escaped = this.escapeRegex(word.trim());
+    const raw = word.trim();
+    const escaped = this.escapeRegex(raw);
 
-    // Gather ranges of existing HTML tags
-    const tagRegex = /<[^>]+>/g;
-    const tagSpans: Array<{ start: number; end: number }> = [];
-    let tagMatch: RegExpExecArray | null;
-    while ((tagMatch = tagRegex.exec(text)) !== null) {
-      tagSpans.push({
-        start: tagMatch.index,
-        end: tagMatch.index + tagMatch[0].length,
-      });
-    }
+    const tryPattern = (pattern: RegExp) => {
+      let match: RegExpExecArray | null;
+      while ((match = pattern.exec(lineText)) !== null) {
+        const matchStart = match.index;
+        const matchEnd = matchStart + match[0].length;
 
-    const checkMatch = (pattern: RegExp): RegExpExecArray | null => {
-      let m: RegExpExecArray | null;
-      while ((m = pattern.exec(text)) !== null) {
-        const mStart = m.index;
-        const mEnd = mStart + m[0].length;
-        const isInsideTag = tagSpans.some(
-          (span) => mStart < span.end && mEnd > span.start
-        );
-        if (!isInsideTag) {
-          return m;
+        if (options?.excludeRange) {
+          const { start, end } = options.excludeRange;
+          if (matchStart < end && matchEnd > start) {
+            continue;
+          }
         }
+
+        return { start: matchStart, end: matchEnd };
       }
       return null;
     };
 
-    // 1. Try word-boundary match first
-    const wordBoundaryPattern = new RegExp(`\\b${escaped}\\b`, "gi");
-    const wbMatch = checkMatch(wordBoundaryPattern);
-    if (wbMatch) return wbMatch;
+    // 1. Try matching with word boundary first
+    const wbResult = tryPattern(new RegExp(`\\b${escaped}\\b`, "gi"));
+    if (wbResult) return wbResult;
 
-    // 2. Fallback to generic substring match
-    const fallbackPattern = new RegExp(escaped, "gi");
-    return checkMatch(fallbackPattern);
+    // 2. Fallback to exact substring match
+    return tryPattern(new RegExp(escaped, "gi"));
   }
 
   /**
-   * Replaces the first occurrence of flagged word in text with the formatted nuance highlight.
-   */
-  static highlightNuanceInString(
-    text: string,
-    flagged: FlaggedItem,
-    style: HighlightStyle
-  ): { updatedText: string; matched: boolean } {
-    if (!flagged.original || !flagged.original.trim()) {
-      return { updatedText: text, matched: false };
-    }
-
-    const match = this.findMatchOutsideTags(text, flagged.original);
-    if (!match || match.index === undefined) {
-      return { updatedText: text, matched: false };
-    }
-
-    const matchedStr = match[0];
-    const start = match.index;
-    const end = start + matchedStr.length;
-
-    const formatted = this.formatNuance(
-      matchedStr,
-      flagged.suggestion,
-      flagged.reason,
-      style
-    );
-
-    const updatedText = text.slice(0, start) + formatted + text.slice(end);
-    return { updatedText, matched: true };
-  }
-
-  /**
-   * Applies the translation and optional nuance highlighting cleanly to the active editor.
+   * Applies the translation to the editor text cleanly (ZERO HTML tags)
+   * and dispatches visual CodeMirror 6 editor decorations for replaced & nuance words.
    */
   static applyToEditor(
     editor: Editor,
@@ -158,76 +126,104 @@ export class HighlightManager {
     result: TranslationResult,
     settings: FluencyBridgeSettings
   ): { cursorCh: number; line: number } {
-    const isSingleLine = target.replaceRange.from.line === target.replaceRange.to.line;
-    const style = settings.highlightStyle || "html";
+    const style = settings.highlightStyle || "decorations";
     const highlightReplaced = settings.highlightReplacedText ?? true;
     const highlightNuance = settings.highlightFlaggedNuances ?? true;
 
-    const formattedReplacement = this.formatReplacement(
-      result.replacement,
-      target.rawExpression,
-      style,
-      highlightReplaced
+    // The text to insert into the document: purely natural text (or ==text== if user explicitly chose markdown)
+    let textToInsert = result.replacement;
+    if (style === "markdown" && highlightReplaced) {
+      textToInsert = `==${result.replacement}==`;
+    }
+
+    const fromOffset = editor.posToOffset(target.replaceRange.from);
+
+    // Replace bracketed text in the document with clean replacement
+    editor.replaceRange(
+      textToInsert,
+      target.replaceRange.from,
+      target.replaceRange.to
     );
 
-    if (isSingleLine) {
-      const lineNum = target.replaceRange.from.line;
-      const lineText = editor.getLine(lineNum);
-      const fromCh = target.replaceRange.from.ch;
-      const toCh = target.replaceRange.to.ch;
+    const toOffset = fromOffset + textToInsert.length;
+    const newCursorPos = editor.offsetToPos(toOffset);
+    editor.setCursor(newCursorPos);
 
-      let prefix = lineText.slice(0, fromCh);
-      let suffix = lineText.slice(toCh);
+    // Apply CodeMirror 6 visual decorations (no text pollution)
+    if (style === "decorations") {
+      const editorView = getEditorView(editor);
+      if (editorView) {
+        const decos: FluencyDecorationSpec[] = [];
 
-      if (highlightNuance && result.flaggedItem && style !== "none") {
-        const prefixRes = this.highlightNuanceInString(
-          prefix,
-          result.flaggedItem,
-          style
-        );
-        if (prefixRes.matched) {
-          prefix = prefixRes.updatedText;
-        } else {
-          const suffixRes = this.highlightNuanceInString(
-            suffix,
-            result.flaggedItem,
-            style
-          );
-          if (suffixRes.matched) {
-            suffix = suffixRes.updatedText;
+        // 1. Replaced expression decoration
+        if (highlightReplaced) {
+          decos.push({
+            from: fromOffset,
+            to: toOffset,
+            type: "replaced",
+            tooltip: `Orijinal: [${target.rawExpression}]`,
+          });
+        }
+
+        // 2. Nuance / Typo flagged word decoration
+        if (highlightNuance && result.flaggedItem?.original) {
+          const lineNum = target.replaceRange.from.line;
+          const lineText = editor.getLine(lineNum);
+          const match = this.findWordInLine(lineText, result.flaggedItem.original, {
+            excludeRange: {
+              start: target.replaceRange.from.ch,
+              end: target.replaceRange.from.ch + textToInsert.length,
+            },
+          });
+
+          if (match) {
+            const nuanceFrom = editor.posToOffset({ line: lineNum, ch: match.start });
+            const nuanceTo = editor.posToOffset({ line: lineNum, ch: match.end });
+            decos.push({
+              from: nuanceFrom,
+              to: nuanceTo,
+              type: "nuance",
+              tooltip: `💡 Öneri: ${result.flaggedItem.suggestion} (${result.flaggedItem.reason || "İpucu"})`,
+            });
           }
         }
+
+        if (decos.length > 0) {
+          editorView.dispatch({
+            effects: [addFluencyDecorations.of(decos)],
+          });
+        }
       }
-
-      const newLine = prefix + formattedReplacement + suffix;
-      editor.setLine(lineNum, newLine);
-
-      const cursorCh = prefix.length + formattedReplacement.length;
-      editor.setCursor({ line: lineNum, ch: cursorCh });
-      return { cursorCh, line: lineNum };
-    } else {
-      // Multi-line replacement fallback
-      editor.replaceRange(
-        formattedReplacement,
-        target.replaceRange.from,
-        target.replaceRange.to
-      );
-      const cursorCh = target.replaceRange.from.ch + formattedReplacement.length;
-      editor.setCursor({ line: target.replaceRange.from.line, ch: cursorCh });
-      return { cursorCh, line: target.replaceRange.from.line };
     }
+
+    return { cursorCh: newCursorPos.ch, line: newCursorPos.line };
   }
 
   /**
-   * Strips all Fluency Bridge highlight marks (<mark class="...fb-...">) from a given string.
+   * Clears CodeMirror 6 editor decorations and any legacy HTML marks.
    */
-  static stripHighlights(content: string): { cleaned: string; count: number } {
+  static clearHighlights(editor: Editor): { legacyRemovedCount: number } {
+    // 1. Clear CodeMirror 6 Decorations
+    const editorView = getEditorView(editor);
+    if (editorView) {
+      editorView.dispatch({
+        effects: [clearFluencyDecorations.of()],
+      });
+    }
+
+    // 2. Also strip any legacy <mark class="fb-..."> tags from file content if present
+    const content = editor.getValue();
     const regex = /<mark\s+class="[^"]*fb-(?:highlight|replaced|nuance)[^"]*"[^>]*>([\s\S]*?)<\/mark>/gi;
-    let count = 0;
+    let legacyRemovedCount = 0;
     const cleaned = content.replace(regex, (_match, group1) => {
-      count++;
+      legacyRemovedCount++;
       return group1;
     });
-    return { cleaned, count };
+
+    if (legacyRemovedCount > 0) {
+      editor.setValue(cleaned);
+    }
+
+    return { legacyRemovedCount };
   }
 }

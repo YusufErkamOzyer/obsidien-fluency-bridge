@@ -4,7 +4,7 @@ import { FluencyBridgeSettingTab } from "./settings";
 import { LLMClient } from "./llm/client";
 import { ContextParser } from "./services/contextParser";
 import { VocabularyManager } from "./services/vocabulary";
-import { HighlightManager } from "./services/highlightManager";
+import { fluencyHighlightField, HighlightManager } from "./services/highlightManager";
 
 export default class FluencyBridgePlugin extends Plugin {
   settings: FluencyBridgeSettings = DEFAULT_SETTINGS;
@@ -16,6 +16,9 @@ export default class FluencyBridgePlugin extends Plugin {
 
     this.llmClient = new LLMClient(this.settings);
     this.vocabManager = new VocabularyManager(this.app, this.settings);
+
+    // Register CodeMirror 6 Visual Highlight Extension (Zero HTML tags in Markdown)
+    this.registerEditorExtension(fluencyHighlightField);
 
     // Add Settings Tab
     this.addSettingTab(new FluencyBridgeSettingTab(this.app, this));
@@ -104,7 +107,7 @@ export default class FluencyBridgePlugin extends Plugin {
         return;
       }
 
-      // Apply the formatted replacement and nuance highlights to the active editor
+      // Apply the translation cleanly without HTML tags and trigger CM6 editor decorations
       HighlightManager.applyToEditor(editor, target, result, this.settings);
 
       // Show Fluency & Nuance feedback tip if provided
@@ -129,14 +132,11 @@ export default class FluencyBridgePlugin extends Plugin {
   }
 
   private handleClearHighlights(editor: Editor) {
-    const content = editor.getValue();
-    const { cleaned, count } = HighlightManager.stripHighlights(content);
-
-    if (count > 0) {
-      editor.setValue(cleaned);
-      new Notice(`✓ Fluency Bridge: ${count} adet vurgulama temizlendi.`, 3000);
+    const { legacyRemovedCount } = HighlightManager.clearHighlights(editor);
+    if (legacyRemovedCount > 0) {
+      new Notice(`✓ Fluency Bridge: Görsel vurgular ve ${legacyRemovedCount} adet eski etiket temizlendi.`, 3000);
     } else {
-      new Notice("Fluency Bridge: Temizlenecek vurgulama bulunamadı.", 3000);
+      new Notice("✓ Fluency Bridge: Görsel vurgulamalar temizlendi.", 2500);
     }
   }
 }

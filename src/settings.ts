@@ -122,10 +122,10 @@ export class FluencyBridgeSettingTab extends PluginSettingTab {
       .setDesc("Düzeltilen yerlerin ve ipucu verilen kelimelerin nasıl gösterileceğini belirleyin.")
       .addDropdown((dropdown) => {
         dropdown
-          .addOption("html", "🎨 Renkli HTML İşaretleme (<mark> - Tooltip Destekli)")
+          .addOption("decorations", "✨ Doğal Editör Vurgusu (CodeMirror 6 - Sıfır HTML, Dosyayı Kirletmez)")
           .addOption("markdown", "✏️ Standart Markdown (==vurgu==)")
           .addOption("none", "🚫 Vurgusuz (Doğrudan Düz Metin)")
-          .setValue(this.plugin.settings.highlightStyle || "html")
+          .setValue(this.plugin.settings.highlightStyle || "decorations")
           .onChange(async (val) => {
             this.plugin.settings.highlightStyle = val as HighlightStyle;
             await this.plugin.saveSettings();
