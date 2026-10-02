@@ -57,9 +57,14 @@ export class FluencyBridgeSettingTab extends PluginSettingTab {
       });
 
     // 3. Model Name
+    const modelDesc =
+      this.plugin.settings.provider === "groq"
+        ? "Kullanılacak model ID. Groq için: openai/gpt-oss-120b (Önerilen/Akıllı) veya qwen/qwen3.8-27b (Ultra Hızlı - 70ms)"
+        : "Kullanılacak model kimliği (ID).";
+
     new Setting(containerEl)
       .setName("Model Adı")
-      .setDesc("Kullanılacak model kimliği (ID).")
+      .setDesc(modelDesc)
       .addText((text) => {
         text
           .setPlaceholder(providerDef.defaultModel)

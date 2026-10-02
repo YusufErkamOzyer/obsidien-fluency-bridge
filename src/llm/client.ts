@@ -57,7 +57,7 @@ export class LLMClient {
         body: JSON.stringify({
           model,
           messages: [{ role: "user", content: "Reply with 'OK' if you hear me." }],
-          max_tokens: 10,
+          max_tokens: 100,
           temperature: 0.1,
         }),
       });
@@ -142,6 +142,7 @@ Provide the natural replacement to substitute the bracketed text directly.`;
         { role: "user", content: userPrompt },
       ],
       temperature: 0.2,
+      max_tokens: 1024,
       response_format: { type: "json_object" },
     };
 

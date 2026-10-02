@@ -34,7 +34,7 @@ var import_obsidian3 = require("obsidian");
 var DEFAULT_SETTINGS = {
   provider: "groq",
   apiKey: "",
-  model: "llama-3.3-70b-versatile",
+  model: "openai/gpt-oss-120b",
   customEndpoint: "https://api.groq.com/openai/v1/chat/completions",
   vocabularyPath: "Vocabulary.md",
   autoLogVocabulary: true,
@@ -45,7 +45,7 @@ var DEFAULT_SETTINGS = {
 var PROVIDER_DEFAULTS = {
   groq: {
     endpoint: "https://api.groq.com/openai/v1/chat/completions",
-    defaultModel: "llama-3.3-70b-versatile",
+    defaultModel: "openai/gpt-oss-120b",
     placeholderKey: "gsk_..."
   },
   gemini: {
@@ -98,7 +98,8 @@ var FluencyBridgeSettingTab = class extends import_obsidian.PluginSettingTab {
       });
       text.inputEl.type = "password";
     });
-    new import_obsidian.Setting(containerEl).setName("Model Ad\u0131").setDesc("Kullan\u0131lacak model kimli\u011Fi (ID).").addText((text) => {
+    const modelDesc = this.plugin.settings.provider === "groq" ? "Kullan\u0131lacak model ID. Groq i\xE7in: openai/gpt-oss-120b (\xD6nerilen/Ak\u0131ll\u0131) veya qwen/qwen3.8-27b (Ultra H\u0131zl\u0131 - 70ms)" : "Kullan\u0131lacak model kimli\u011Fi (ID).";
+    new import_obsidian.Setting(containerEl).setName("Model Ad\u0131").setDesc(modelDesc).addText((text) => {
       text.setPlaceholder(providerDef.defaultModel).setValue(this.plugin.settings.model).onChange(async (val) => {
         this.plugin.settings.model = val.trim();
         await this.plugin.saveSettings();
@@ -196,7 +197,7 @@ var LLMClient = class {
         body: JSON.stringify({
           model,
           messages: [{ role: "user", content: "Reply with 'OK' if you hear me." }],
-          max_tokens: 10,
+          max_tokens: 100,
           temperature: 0.1
         })
       });
@@ -268,6 +269,7 @@ Provide the natural replacement to substitute the bracketed text directly.`;
         { role: "user", content: userPrompt }
       ],
       temperature: 0.2,
+      max_tokens: 1024,
       response_format: { type: "json_object" }
     };
     const res = await fetch(endpoint, {

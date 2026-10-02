@@ -15,7 +15,7 @@ export interface FluencyBridgeSettings {
 export const DEFAULT_SETTINGS: FluencyBridgeSettings = {
   provider: "groq",
   apiKey: "",
-  model: "llama-3.3-70b-versatile",
+  model: "openai/gpt-oss-120b",
   customEndpoint: "https://api.groq.com/openai/v1/chat/completions",
   vocabularyPath: "Vocabulary.md",
   autoLogVocabulary: true,
@@ -30,7 +30,7 @@ export const PROVIDER_DEFAULTS: Record<
 > = {
   groq: {
     endpoint: "https://api.groq.com/openai/v1/chat/completions",
-    defaultModel: "llama-3.3-70b-versatile",
+    defaultModel: "openai/gpt-oss-120b",
     placeholderKey: "gsk_...",
   },
   gemini: {
