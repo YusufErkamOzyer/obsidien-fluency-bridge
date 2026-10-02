@@ -7,8 +7,7 @@ export interface FluencyBridgeSettings {
   customEndpoint: string;
   vocabularyPath: string;
   autoLogVocabulary: boolean;
-  enableNuanceTips: boolean;
-  enableSlangAlerts?: boolean; // backwards compatibility
+  enableSlangAlerts: boolean;
   nativeLanguage: string;
   targetLanguage: string;
 }
@@ -16,11 +15,11 @@ export interface FluencyBridgeSettings {
 export const DEFAULT_SETTINGS: FluencyBridgeSettings = {
   provider: "groq",
   apiKey: "",
-  model: "openai/gpt-oss-120b",
+  model: "llama-3.3-70b-versatile",
   customEndpoint: "https://api.groq.com/openai/v1/chat/completions",
   vocabularyPath: "Vocabulary.md",
   autoLogVocabulary: true,
-  enableNuanceTips: true,
+  enableSlangAlerts: true,
   nativeLanguage: "Turkish",
   targetLanguage: "English",
 };
@@ -31,7 +30,7 @@ export const PROVIDER_DEFAULTS: Record<
 > = {
   groq: {
     endpoint: "https://api.groq.com/openai/v1/chat/completions",
-    defaultModel: "openai/gpt-oss-120b",
+    defaultModel: "llama-3.3-70b-versatile",
     placeholderKey: "gsk_...",
   },
   gemini: {
@@ -62,8 +61,7 @@ export interface ExtractedTarget {
 
 export interface TranslationResult {
   replacement: string;
-  feedback?: string | null;
-  warning?: string | null; // backwards compatibility
+  warning?: string | null;
   vocabItem?: {
     term: string;
     definition: string;
