@@ -1,0 +1,25 @@
+/* Obsidian Fluency Bridge Styles */
+
+.fluency-bridge-notice {
+  font-family: var(--font-interface);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.fluency-bridge-warning {
+  border-left: 3px solid var(--text-warning);
+  padding-left: 8px;
+  margin-top: 4px;
+  color: var(--text-warning);
+  font-weight: 500;
+}
+
+.fluency-bridge-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  margin-right: 6px;
+}

@@ -1,0 +1,31 @@
+{
+  "name": "obsidian-fluency-bridge",
+  "version": "0.1.0",
+  "description": "In-flow contextual translation, false-friend & slang guard, and active vocabulary builder for Obsidian.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+  },
+  "keywords": [
+    "obsidian",
+    "obsidian-plugin",
+    "translation",
+    "fluency",
+    "language-learning",
+    "llm",
+    "groq",
+    "anki",
+    "vocabulary"
+  ],
+  "author": "Yusuf Erkam Özyer",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.23.0",
+    "obsidian": "latest",
+    "tslib": "^2.6.3",
+    "typescript": "^5.5.0"
+  }
+}

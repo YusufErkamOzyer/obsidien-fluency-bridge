@@ -1,0 +1,9 @@
+{
+  "id": "obsidian-fluency-bridge",
+  "name": "Fluency Bridge",
+  "version": "0.1.0",
+  "minAppVersion": "0.15.0",
+  "description": "In-flow contextual translation, false-friend & slang guard, and active vocabulary builder.",
+  "author": "Yusuf Erkam Özyer",
+  "isDesktopOnly": false
+}
