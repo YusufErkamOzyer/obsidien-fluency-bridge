@@ -102,9 +102,11 @@ export default class FluencyBridgePlugin extends Plugin {
         ch: newCursorCh,
       });
 
-      // Show Slang / False Friend Warning if detected
-      if (this.settings.enableSlangAlerts && result.warning) {
-        new Notice(`⚠️ Tuzak Koruması: ${result.warning}`, 9000);
+      // Show Fluency & Nuance feedback tip if provided
+      const tip = result.feedback || result.warning;
+      const enableTips = this.settings.enableNuanceTips ?? this.settings.enableSlangAlerts ?? true;
+      if (enableTips && tip) {
+        new Notice(`💡 İpucu: ${tip}`, 8000);
       } else {
         new Notice(`✓ Akışa uyarlandı (${durationMs}ms)`, 2000);
       }

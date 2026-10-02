@@ -7,7 +7,8 @@ export interface FluencyBridgeSettings {
   customEndpoint: string;
   vocabularyPath: string;
   autoLogVocabulary: boolean;
-  enableSlangAlerts: boolean;
+  enableNuanceTips: boolean;
+  enableSlangAlerts?: boolean; // backwards compatibility
   nativeLanguage: string;
   targetLanguage: string;
 }
@@ -19,7 +20,7 @@ export const DEFAULT_SETTINGS: FluencyBridgeSettings = {
   customEndpoint: "https://api.groq.com/openai/v1/chat/completions",
   vocabularyPath: "Vocabulary.md",
   autoLogVocabulary: true,
-  enableSlangAlerts: true,
+  enableNuanceTips: true,
   nativeLanguage: "Turkish",
   targetLanguage: "English",
 };
@@ -61,7 +62,8 @@ export interface ExtractedTarget {
 
 export interface TranslationResult {
   replacement: string;
-  warning?: string | null;
+  feedback?: string | null;
+  warning?: string | null; // backwards compatibility
   vocabItem?: {
     term: string;
     definition: string;

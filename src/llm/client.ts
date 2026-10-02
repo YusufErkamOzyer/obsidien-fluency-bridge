@@ -94,22 +94,23 @@ export class LLMClient {
       );
     }
 
-    const systemPrompt = `You are Fluency Bridge, an expert bilingual assistant specialized in helping people write natural, fluent, and idiomatic ${this.settings.targetLanguage} while thinking in ${this.settings.nativeLanguage}.
+    const systemPrompt = `You are Fluency Bridge, an expert bilingual writing coach specialized in helping users write natural, fluent, and idiomatic ${this.settings.targetLanguage} while thinking in ${this.settings.nativeLanguage}.
 
 The user is writing in ${this.settings.targetLanguage}, but hit a mental roadblock and wrote a phrase or word in [brackets] in ${this.settings.nativeLanguage}.
 
 Your goals:
-1. Provide the most natural, idiomatic, and contextually accurate ${this.settings.targetLanguage} replacement that fits seamlessly into the sentence's grammar and tone.
-2. VIGILANT FALSE-FRIEND & SLANG GUARD:
-   - Check if there is an embarrassing, vulgar, or common false-friend mistake (e.g. "gets me hard" instead of "is tough for me", or literal translation blunders).
-   - If there is a nuance pitfall, caution, or vulgarity trap, explain it gently and concisely in Turkish in the "warning" field.
-   - If everything is safe, set "warning" to null.
+1. Provide the most natural, idiomatic, and contextually accurate ${this.settings.targetLanguage} replacement that fits seamlessly into the sentence's grammar, rhythm, and tone.
+2. CONSTRUCTIVE FLUENCY & NUANCE COACHING:
+   - Review the surrounding sentence for any typos (misspellings), unnatural collocations, or phrasing that could be expressed more clearly or idiomatically.
+   - If there is a typo (e.g. "hearth" instead of "heart") or a phrase that would sound significantly more natural (e.g. "do research" instead of "make research"), provide a friendly, concise, and constructive tip in Turkish in the "feedback" field (e.g. "İpucu: Cümledeki 'make research' yerine 'do research' kullanımı daha doğaldır.").
+   - Do NOT lecture or moralize about tone or intent. Focus purely on constructive writing polish, clarity, and linguistic nuances.
+   - If the sentence is already completely natural and error-free, set "feedback" to null.
 3. Extract the key vocabulary item (word or collocation phrase) to add to the user's active vocabulary list.
 
 You MUST respond strictly with valid JSON conforming to this schema (no markdown fences, no extra text):
 {
   "replacement": "exact replacement string for inside or including the brackets",
-  "warning": "Optional concise warning in Turkish about false friends, slang pitfalls, or nuance differences, or null",
+  "feedback": "Optional concise, constructive tip in Turkish about typos, phrasing improvements, or nuance, or null",
   "vocabItem": {
     "term": "the key target language word or idiom",
     "definition": "Türkçe anlamı ve kullanım notu",
@@ -164,14 +165,16 @@ Provide the natural replacement to substitute the bracketed text directly.`;
       throw new Error("Modelden boş yanıt alındı.");
     }
 
+    let parsed: TranslationResult;
     try {
-      const parsed: TranslationResult = JSON.parse(content);
-      return parsed;
+      parsed = JSON.parse(content);
     } catch {
       // Fallback if model wraps in code fences or has formatting issues
       const cleaned = content.replace(/```json\s*/g, "").replace(/```\s*$/g, "").trim();
-      const parsed: TranslationResult = JSON.parse(cleaned);
-      return parsed;
+      parsed = JSON.parse(cleaned);
     }
+
+    parsed.feedback = parsed.feedback || parsed.warning || null;
+    return parsed;
   }
 }

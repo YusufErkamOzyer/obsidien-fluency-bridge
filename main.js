@@ -38,7 +38,7 @@ var DEFAULT_SETTINGS = {
   customEndpoint: "https://api.groq.com/openai/v1/chat/completions",
   vocabularyPath: "Vocabulary.md",
   autoLogVocabulary: true,
-  enableSlangAlerts: true,
+  enableNuanceTips: true,
   nativeLanguage: "Turkish",
   targetLanguage: "English"
 };
@@ -140,8 +140,9 @@ var FluencyBridgeSettingTab = class extends import_obsidian.PluginSettingTab {
         await this.plugin.saveSettings();
       });
     });
-    new import_obsidian.Setting(containerEl).setName("Argo & False-Friend Korumas\u0131").setDesc("\u0130ki dilli tuzaklar (\xF6rn: 'gets me hard' gibi argo veya utan\xE7 verici kullan\u0131mlar) tespit edildi\u011Finde ekranda nazik bir uyar\u0131 bildirimi g\xF6ster.").addToggle((toggle) => {
-      toggle.setValue(this.plugin.settings.enableSlangAlerts).onChange(async (val) => {
+    new import_obsidian.Setting(containerEl).setName("Yaz\u0131m ve Do\u011Fall\u0131k \xD6nerileri (Fluency & Nuance Tips)").setDesc("C\xFCmlenizdeki olas\u0131 yaz\u0131m hatalar\u0131 (typo), daha do\u011Fal alternatif ifadeler ve ba\u011Flamsal n\xFCanslar hakk\u0131nda yap\u0131c\u0131 ipu\xE7lar\u0131 g\xF6ster.").addToggle((toggle) => {
+      toggle.setValue(this.plugin.settings.enableNuanceTips).onChange(async (val) => {
+        this.plugin.settings.enableNuanceTips = val;
         this.plugin.settings.enableSlangAlerts = val;
         await this.plugin.saveSettings();
       });
@@ -226,22 +227,23 @@ var LLMClient = class {
         "Fluency Bridge API Anahtar\u0131 ayarlanmam\u0131\u015F! L\xFCtfen Eklenti Ayarlar\u0131ndan API anahtar\u0131n\u0131z\u0131 girin."
       );
     }
-    const systemPrompt = `You are Fluency Bridge, an expert bilingual assistant specialized in helping people write natural, fluent, and idiomatic ${this.settings.targetLanguage} while thinking in ${this.settings.nativeLanguage}.
+    const systemPrompt = `You are Fluency Bridge, an expert bilingual writing coach specialized in helping users write natural, fluent, and idiomatic ${this.settings.targetLanguage} while thinking in ${this.settings.nativeLanguage}.
 
 The user is writing in ${this.settings.targetLanguage}, but hit a mental roadblock and wrote a phrase or word in [brackets] in ${this.settings.nativeLanguage}.
 
 Your goals:
-1. Provide the most natural, idiomatic, and contextually accurate ${this.settings.targetLanguage} replacement that fits seamlessly into the sentence's grammar and tone.
-2. VIGILANT FALSE-FRIEND & SLANG GUARD:
-   - Check if there is an embarrassing, vulgar, or common false-friend mistake (e.g. "gets me hard" instead of "is tough for me", or literal translation blunders).
-   - If there is a nuance pitfall, caution, or vulgarity trap, explain it gently and concisely in Turkish in the "warning" field.
-   - If everything is safe, set "warning" to null.
+1. Provide the most natural, idiomatic, and contextually accurate ${this.settings.targetLanguage} replacement that fits seamlessly into the sentence's grammar, rhythm, and tone.
+2. CONSTRUCTIVE FLUENCY & NUANCE COACHING:
+   - Review the surrounding sentence for any typos (misspellings), unnatural collocations, or phrasing that could be expressed more clearly or idiomatically.
+   - If there is a typo (e.g. "hearth" instead of "heart") or a phrase that would sound significantly more natural (e.g. "do research" instead of "make research"), provide a friendly, concise, and constructive tip in Turkish in the "feedback" field (e.g. "\u0130pucu: C\xFCmledeki 'make research' yerine 'do research' kullan\u0131m\u0131 daha do\u011Fald\u0131r.").
+   - Do NOT lecture or moralize about tone or intent. Focus purely on constructive writing polish, clarity, and linguistic nuances.
+   - If the sentence is already completely natural and error-free, set "feedback" to null.
 3. Extract the key vocabulary item (word or collocation phrase) to add to the user's active vocabulary list.
 
 You MUST respond strictly with valid JSON conforming to this schema (no markdown fences, no extra text):
 {
   "replacement": "exact replacement string for inside or including the brackets",
-  "warning": "Optional concise warning in Turkish about false friends, slang pitfalls, or nuance differences, or null",
+  "feedback": "Optional concise, constructive tip in Turkish about typos, phrasing improvements, or nuance, or null",
   "vocabItem": {
     "term": "the key target language word or idiom",
     "definition": "T\xFCrk\xE7e anlam\u0131 ve kullan\u0131m notu",
@@ -286,14 +288,15 @@ Provide the natural replacement to substitute the bracketed text directly.`;
     if (!content) {
       throw new Error("Modelden bo\u015F yan\u0131t al\u0131nd\u0131.");
     }
+    let parsed;
     try {
-      const parsed = JSON.parse(content);
-      return parsed;
+      parsed = JSON.parse(content);
     } catch {
       const cleaned = content.replace(/```json\s*/g, "").replace(/```\s*$/g, "").trim();
-      const parsed = JSON.parse(cleaned);
-      return parsed;
+      parsed = JSON.parse(cleaned);
     }
+    parsed.feedback = parsed.feedback || parsed.warning || null;
+    return parsed;
   }
 };
 
@@ -481,8 +484,10 @@ var FluencyBridgePlugin = class extends import_obsidian3.Plugin {
         line: target.replaceRange.from.line,
         ch: newCursorCh
       });
-      if (this.settings.enableSlangAlerts && result.warning) {
-        new import_obsidian3.Notice(`\u26A0\uFE0F Tuzak Korumas\u0131: ${result.warning}`, 9e3);
+      const tip = result.feedback || result.warning;
+      const enableTips = this.settings.enableNuanceTips ?? this.settings.enableSlangAlerts ?? true;
+      if (enableTips && tip) {
+        new import_obsidian3.Notice(`\u{1F4A1} \u0130pucu: ${tip}`, 8e3);
       } else {
         new import_obsidian3.Notice(`\u2713 Ak\u0131\u015Fa uyarland\u0131 (${durationMs}ms)`, 2e3);
       }

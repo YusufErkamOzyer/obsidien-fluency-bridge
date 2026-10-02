@@ -1,13 +1,13 @@
 # 🌉 Obsidian Fluency Bridge
 
-> **İkinci Dilde (İngilizce) Günlük ve Not Yazanlar İçin "Akış Bozmayan" (In-Flow) Bağlamsal Çeviri, Yanlış Kullanım Koruması ve Aktif Kelime Haznesi (SRS) Obsidian Eklentisi.**
+> **İkinci Dilde (İngilizce) Günlük ve Not Yazanlar İçin "Akış Bozmayan" (In-Flow) Bağlamsal Çeviri, Yazım & Doğallık İpuçları ve Aktif Kelime Haznesi (SRS) Obsidian Eklentisi.**
 
 ---
 
 ## ⚡ Neden Fluency Bridge?
 
 1. **Yazma Akışını (Flow State) Bozmaz:** Tarayıcıya veya sözlüğe geçmeden, cümlenizin ortasında `[takıldığınız Türkçe ifadeyi]` yazıp `Cmd + Shift + E` kısayoluna basmanız yeterlidir. Cümle bağlamına en uygun doğal İngilizce ifade yerinde değiştirilir.
-2. **False-Friends & Argo Koruması (Slang Guard):** Birebir çevirilerin yol açtığı utanç verici hataları (örneğin *"beni çok zorluyor"* için *"it gets me hard"* yazılması gibi felaketleri) tespit eder ve kibar bir bildirimle uyarır.
+2. **Yazım ve Doğallık Önerileri (Fluency & Nuance Tips):** Cümlenizdeki olası yazım hatalarını (typo), daha doğal eşdizimleri veya alternatif yerli ifadeleri yapıcı ve nazik bir ipucu bildirimiyle sunar.
 3. **Otomatik Kelime Kasası (Active Vocabulary Deck):** Değiştirilen her deyim ve kelime, kasanızdaki `Vocabulary.md` dosyasına cümlenin bağlamı ve Türkçe notuyla birlikte otomatik tablo satırı olarak işlenir.
 
 ---
@@ -16,7 +16,7 @@
 
 | Sağlayıcı | Model | Neden Tercih Edilmeli? |
 | :--- | :--- | :--- |
-| **⚡ Groq (Önerilen)** | `llama-3.3-70b-versatile` | **~200ms ultra hızlı yanıt.** Ücretsiz GroqCloud API anahtarıyla akışı hiç kesmez. |
+| **⚡ Groq (Önerilen)** | `openai/gpt-oss-120b` / `qwen/qwen3.8-27b` | **Ultra hızlı yanıt.** Ücretsiz GroqCloud API anahtarıyla akışı hiç kesmez. |
 | **✨ Google Gemini** | `gemini-2.0-flash` | Google AI Studio ücretsiz API anahtarı ile yüksek bağlamsal doğruluk. |
 | **🌐 OpenRouter** | `:free` modeller | Çeşitli açık kaynaklı modelleri denemek için. |
 | **💻 Özel / Yerel (Ollama)** | `llama3.1`, `qwen2.5` vb. | `http://localhost:11434/v1` üzerinden internetsiz ve gizli çalışma. |

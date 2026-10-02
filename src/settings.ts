@@ -143,14 +143,15 @@ export class FluencyBridgeSettingTab extends PluginSettingTab {
           });
       });
 
-    // 8. Slang & False Friend Alert
+    // 8. Fluency & Nuance Tips
     new Setting(containerEl)
-      .setName("Argo & False-Friend Koruması")
-      .setDesc("İki dilli tuzaklar (örn: 'gets me hard' gibi argo veya utanç verici kullanımlar) tespit edildiğinde ekranda nazik bir uyarı bildirimi göster.")
+      .setName("Yazım ve Doğallık Önerileri (Fluency & Nuance Tips)")
+      .setDesc("Cümlenizdeki olası yazım hataları (typo), daha doğal alternatif ifadeler ve bağlamsal nüanslar hakkında yapıcı ipuçları göster.")
       .addToggle((toggle) => {
         toggle
-          .setValue(this.plugin.settings.enableSlangAlerts)
+          .setValue(this.plugin.settings.enableNuanceTips)
           .onChange(async (val) => {
+            this.plugin.settings.enableNuanceTips = val;
             this.plugin.settings.enableSlangAlerts = val;
             await this.plugin.saveSettings();
           });
