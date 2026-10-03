@@ -8,7 +8,17 @@ export interface FlaggedItem {
   reason: string;
 }
 
+/** A highlight persisted per note so it survives closing/reopening the note. */
+export interface StoredHighlight {
+  from: number;
+  to: number;
+  text: string; // exact text covered, used to re-locate the range if the note changed
+  type: "replaced" | "nuance";
+  tooltip: string;
+}
+
 export interface FluencyBridgeSettings {
+  savedHighlights: Record<string, StoredHighlight[]>;
   provider: LLMProvider;
   apiKey: string;
   model: string;
@@ -25,6 +35,7 @@ export interface FluencyBridgeSettings {
 }
 
 export const DEFAULT_SETTINGS: FluencyBridgeSettings = {
+  savedHighlights: {},
   provider: "groq",
   apiKey: "",
   model: "llama-3.3-70b-versatile",
@@ -79,7 +90,8 @@ export interface TranslationResult {
   replacement: string;
   feedback?: string | null;
   warning?: string | null;
-  flaggedItem?: FlaggedItem | null;
+  flaggedItem?: FlaggedItem | null; // legacy single-item form
+  flaggedItems?: FlaggedItem[];
   vocabItem?: {
     term: string;
     definition: string;

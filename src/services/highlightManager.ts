@@ -1,9 +1,11 @@
-import { StateField, StateEffect } from "@codemirror/state";
+import { StateField, StateEffect, EditorState } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView } from "@codemirror/view";
-import { Editor } from "obsidian";
+import { Editor, editorInfoField } from "obsidian";
 import {
   ExtractedTarget,
+  FlaggedItem,
   FluencyBridgeSettings,
+  StoredHighlight,
   TranslationResult,
 } from "../types";
 
@@ -27,19 +29,34 @@ export const fluencyHighlightField = StateField.define<DecorationSet>({
     return Decoration.none;
   },
   update(decorations, tr) {
+    // A flagged word the user has edited (typo fixed or changed) must stop being marked.
+    if (tr.docChanged) {
+      const touched: Array<[number, number]> = [];
+      tr.changes.iterChangedRanges((fromA, toA) => touched.push([fromA, toA]));
+      decorations = decorations.update({
+        filter: (from, to, value) => {
+          const cls = (value.spec as { class?: string }).class ?? "";
+          if (!cls.includes("fb-nuance")) return true;
+          return !touched.some(([a, b]) => a < to && b > from);
+        },
+      });
+    }
+
     // Automatically adjust ranges as user types or modifies text
     decorations = decorations.map(tr.changes);
 
     for (const effect of tr.effects) {
       if (effect.is(addFluencyDecorations)) {
-        const marks = effect.value.map((spec) =>
-          Decoration.mark({
-            class: `fb-highlight fb-${spec.type}`,
-            attributes: {
-              title: spec.tooltip,
-            },
-          }).range(spec.from, spec.to)
-        );
+        const marks = effect.value
+          .filter((spec) => spec.to > spec.from)
+          .map((spec) =>
+            Decoration.mark({
+              class: `fb-highlight fb-${spec.type}`,
+              attributes: {
+                title: spec.tooltip,
+              },
+            }).range(spec.from, spec.to)
+          );
 
         decorations = decorations.update({
           add: marks,
@@ -54,6 +71,125 @@ export const fluencyHighlightField = StateField.define<DecorationSet>({
   },
   provide: (f) => EditorView.decorations.from(f),
 });
+
+/**
+ * Snapshot of all live highlights in an editor state, in a JSON-serializable form.
+ */
+export function extractStoredHighlights(state: EditorState): StoredHighlight[] {
+  const set = state.field(fluencyHighlightField, false);
+  const out: StoredHighlight[] = [];
+  if (!set) return out;
+
+  const iter = set.iter();
+  while (iter.value) {
+    const spec = iter.value.spec as { class?: string; attributes?: { title?: string } };
+    out.push({
+      from: iter.from,
+      to: iter.to,
+      text: state.doc.sliceString(iter.from, iter.to),
+      type: spec.class?.includes("fb-nuance") ? "nuance" : "replaced",
+      tooltip: spec.attributes?.title ?? "",
+    });
+    iter.next();
+  }
+  return out;
+}
+
+/**
+ * Re-locates persisted highlights inside the current document text.
+ * If the text still sits at the stored offset it is used as-is; otherwise the nearest
+ * occurrence of the same text is used. Highlights whose text no longer exists are dropped.
+ */
+export function resolveStoredHighlights(
+  docText: string,
+  stored: StoredHighlight[]
+): FluencyDecorationSpec[] {
+  const resolved: FluencyDecorationSpec[] = [];
+
+  for (const h of stored) {
+    if (!h.text) continue;
+
+    let from = -1;
+    if (docText.slice(h.from, h.from + h.text.length) === h.text) {
+      from = h.from;
+    } else {
+      let best = -1;
+      let bestDist = Infinity;
+      let idx = docText.indexOf(h.text);
+      while (idx !== -1) {
+        const dist = Math.abs(idx - h.from);
+        if (dist < bestDist) {
+          best = idx;
+          bestDist = dist;
+        }
+        idx = docText.indexOf(h.text, idx + 1);
+      }
+      from = best;
+    }
+
+    if (from < 0) continue;
+    resolved.push({
+      from,
+      to: from + h.text.length,
+      type: h.type,
+      tooltip: h.tooltip,
+    });
+  }
+
+  return resolved;
+}
+
+export interface HighlightUpdateLike {
+  startState: EditorState;
+  state: EditorState;
+  docChanged: boolean;
+  changes: { iterChangedRanges: (f: (fromA: number, toA: number) => void) => void };
+  transactions: ReadonlyArray<{ effects: ReadonlyArray<StateEffect<any>> }>;
+}
+
+/**
+ * Decides whether an editor update changed a note's highlights and, if so, reports a fresh snapshot.
+ * Pure (apart from the callback) so it can be unit-tested without a DOM.
+ */
+export function handleHighlightUpdate(
+  update: HighlightUpdateLike,
+  onChange: (path: string, highlights: StoredHighlight[]) => void
+) {
+  const touchedHighlights = update.transactions.some((tr) =>
+    tr.effects.some((e) => e.is(addFluencyDecorations) || e.is(clearFluencyDecorations))
+  );
+  if (!update.docChanged && !touchedHighlights) return;
+
+  const before = update.startState.field(fluencyHighlightField, false)?.size ?? 0;
+  const after = update.state.field(fluencyHighlightField, false)?.size ?? 0;
+  if (before === 0 && after === 0) return;
+
+  // Obsidian swaps the whole document when a different note is loaded into a reused editor.
+  // That is not a user edit; saving here would wipe the highlights of the note.
+  if (update.docChanged && !touchedHighlights) {
+    const oldLen = update.startState.doc.length;
+    let replacedWholeDoc = false;
+    update.changes.iterChangedRanges((fromA, toA) => {
+      if (oldLen > 0 && fromA === 0 && toA === oldLen) replacedWholeDoc = true;
+    });
+    if (replacedWholeDoc) return;
+  }
+
+  const file = update.state.field(editorInfoField, false)?.file;
+  if (!file) return;
+
+  onChange(file.path, extractStoredHighlights(update.state));
+}
+
+/**
+ * Editor extension that reports every change of the highlight set together with the note path,
+ * so the plugin can persist highlights and restore them after the note is closed and reopened.
+ */
+export function createHighlightPersistence(
+  onChange: (path: string, highlights: StoredHighlight[]) => void
+) {
+  return EditorView.updateListener.of((update) => handleHighlightUpdate(update, onChange));
+}
 
 /**
  * Safely extracts the CodeMirror 6 EditorView instance from an Obsidian Editor.
@@ -78,42 +214,84 @@ export class HighlightManager {
   }
 
   /**
-   * Searches for a target word/phrase on a given line while avoiding specified character spans.
+   * Finds EVERY occurrence of a word/phrase on a line.
+   * Tolerates different whitespace, surrounding punctuation and letter case.
+   * Whole-word matches are preferred; a plain substring match is used only if none exist.
    */
-  static findWordInLine(
-    lineText: string,
-    word: string,
-    options?: { excludeRange?: { start: number; end: number } }
-  ): { start: number; end: number } | null {
-    if (!word || !word.trim()) return null;
+  static findAllInLine(lineText: string, word: string): Array<{ start: number; end: number }> {
+    const cleaned = (word || "").trim().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+    if (!cleaned) return [];
 
-    const raw = word.trim();
-    const escaped = this.escapeRegex(raw);
+    const body = cleaned.split(/\s+/).map((part) => this.escapeRegex(part)).join("\\s+");
 
-    const tryPattern = (pattern: RegExp) => {
+    const collect = (pattern: RegExp) => {
+      const found: Array<{ start: number; end: number }> = [];
       let match: RegExpExecArray | null;
       while ((match = pattern.exec(lineText)) !== null) {
-        const matchStart = match.index;
-        const matchEnd = matchStart + match[0].length;
-
-        if (options?.excludeRange) {
-          const { start, end } = options.excludeRange;
-          if (matchStart < end && matchEnd > start) {
-            continue;
-          }
+        if (match[0].length === 0) {
+          pattern.lastIndex++;
+          continue;
         }
-
-        return { start: matchStart, end: matchEnd };
+        found.push({ start: match.index, end: match.index + match[0].length });
       }
-      return null;
+      return found;
     };
 
-    // 1. Try matching with word boundary first
-    const wbResult = tryPattern(new RegExp(`\\b${escaped}\\b`, "gi"));
-    if (wbResult) return wbResult;
+    const wholeWord = collect(
+      new RegExp(`(?<![\\p{L}\\p{N}_])${body}(?![\\p{L}\\p{N}_])`, "giu")
+    );
+    if (wholeWord.length > 0) return wholeWord;
 
-    // 2. Fallback to exact substring match
-    return tryPattern(new RegExp(escaped, "gi"));
+    return collect(new RegExp(body, "giu"));
+  }
+
+  /**
+   * Collects all distinct flagged items from a result (new array form + legacy single form).
+   */
+  static collectFlaggedItems(result: TranslationResult): FlaggedItem[] {
+    const all: FlaggedItem[] = [
+      ...(result.flaggedItems ?? []),
+      ...(result.flaggedItem ? [result.flaggedItem] : []),
+    ];
+    const seen = new Set<string>();
+    const unique: FlaggedItem[] = [];
+    for (const item of all) {
+      const key = (item?.original ?? "").trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      unique.push(item);
+    }
+    return unique;
+  }
+
+  /**
+   * Computes the nuance decorations for a line: every occurrence of every flagged item,
+   * never overlapping the replaced span or each other.
+   */
+  static computeNuanceSpecs(
+    lineText: string,
+    lineStartOffset: number,
+    items: FlaggedItem[],
+    occupied: Array<{ start: number; end: number }>
+  ): FluencyDecorationSpec[] {
+    const specs: FluencyDecorationSpec[] = [];
+    const taken = [...occupied];
+    const overlaps = (s: number, e: number) => taken.some((t) => s < t.end && e > t.start);
+
+    for (const item of items) {
+      const tooltip = `💡 Öneri: ${item.suggestion} (${item.reason || "İpucu"})`;
+      for (const m of this.findAllInLine(lineText, item.original)) {
+        if (overlaps(m.start, m.end)) continue;
+        taken.push(m);
+        specs.push({
+          from: lineStartOffset + m.start,
+          to: lineStartOffset + m.end,
+          type: "nuance",
+          tooltip,
+        });
+      }
+    }
+    return specs;
   }
 
   /**
@@ -165,27 +343,19 @@ export class HighlightManager {
           });
         }
 
-        // 2. Nuance / Typo flagged word decoration
-        if (highlightNuance && result.flaggedItem?.original) {
+        // 2. Nuance / typo decorations: ALL flagged items, ALL their occurrences
+        const items = this.collectFlaggedItems(result);
+        if (highlightNuance && items.length > 0) {
           const lineNum = target.replaceRange.from.line;
           const lineText = editor.getLine(lineNum);
-          const match = this.findWordInLine(lineText, result.flaggedItem.original, {
-            excludeRange: {
-              start: target.replaceRange.from.ch,
-              end: target.replaceRange.from.ch + textToInsert.length,
-            },
-          });
-
-          if (match) {
-            const nuanceFrom = editor.posToOffset({ line: lineNum, ch: match.start });
-            const nuanceTo = editor.posToOffset({ line: lineNum, ch: match.end });
-            decos.push({
-              from: nuanceFrom,
-              to: nuanceTo,
-              type: "nuance",
-              tooltip: `💡 Öneri: ${result.flaggedItem.suggestion} (${result.flaggedItem.reason || "İpucu"})`,
-            });
-          }
+          const lineStartOffset = editor.posToOffset({ line: lineNum, ch: 0 });
+          const replacedSpan = {
+            start: target.replaceRange.from.ch,
+            end: target.replaceRange.from.ch + textToInsert.length,
+          };
+          decos.push(
+            ...this.computeNuanceSpecs(lineText, lineStartOffset, items, [replacedSpan])
+          );
         }
 
         if (decos.length > 0) {
@@ -197,6 +367,24 @@ export class HighlightManager {
     }
 
     return { cursorCh: newCursorPos.ch, line: newCursorPos.line };
+  }
+
+  /**
+   * Re-applies persisted highlights to an editor (used after a note is reopened).
+   * Returns the number of highlights applied; does nothing if the editor already shows highlights.
+   */
+  static restoreToEditor(editor: Editor, stored: StoredHighlight[]): number {
+    const editorView = getEditorView(editor);
+    if (!editorView || stored.length === 0) return 0;
+
+    const current = editorView.state.field(fluencyHighlightField, false);
+    if (!current || current.size > 0) return 0;
+
+    const specs = resolveStoredHighlights(editorView.state.doc.toString(), stored);
+    if (specs.length === 0) return 0;
+
+    editorView.dispatch({ effects: [addFluencyDecorations.of(specs)] });
+    return specs.length;
   }
 
   /**

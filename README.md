@@ -10,7 +10,8 @@
 2. **✨ Doğal Editör Vurgulaması (CodeMirror 6 Decorations - v0.2):**
    - **Sıfır HTML Etiketi / %100 Temiz Markdown:** Markdown dosyanıza hiçbir yabancı `<mark>` veya HTML etiketi **eklenmez**. Metniniz her zaman saf ve pürüzsüz kalır.
    - **Düzeltilen Çeviriler (`.fb-replaced`):** Çevrilen yerler editör üzerinde anında sakin mavi/turkuaz bir vurgu alır. Bilgisayar başından ayrılsanız bile döndüğünüzde neyin değiştiğini hemen fark edersiniz. Fareyle üzerine geldiğinizde (hover tooltip) orijinal Türkçe ifade gösterilir (`Orijinal: [ifade]`).
-   - **Hata & Nüans Uyarıları (`.fb-nuance`):** Cümledeki yazım hataları (typo) veya daha doğal eşdizimler (örn: *make research* yerine *do research*) kehribar rengi dalgalı alt çizgi ile editörde işaretlenir. Üzerine gelindiğinde yapıcı ipucu ve önerilen alternatif görüntülenir.
+   - **Hata & Nüans Uyarıları (`.fb-nuance`):** Cümledeki **tüm** yazım hataları (typo) veya daha doğal eşdizimler (örn: *make research* yerine *do research*) kehribar rengi dalgalı alt çizgi ile editörde işaretlenir; bir cümlede birden fazla hata varsa hepsi boyanır. Üzerine gelindiğinde yapıcı ipucu ve önerilen alternatif görüntülenir. Hatayı kendiniz düzelttiğinizde işaret otomatik kalkar.
+   - **Kalıcı Vurgular:** Notu kapatıp açsanız, sekme değiştirseniz veya Obsidian'ı yeniden başlatsanız bile vurgular geri gelir (notun içine hiçbir şey yazılmadan, eklenti verisinde saklanır).
    - **Tek Tuşla Temizleme (`Cmd + Shift + H`):** İstediğiniz an tek bir komutla tüm görsel vurgulamaları kaldırabilirsiniz.
 3. **Yazım ve Doğallık Önerileri (Fluency & Nuance Tips):** Cümlenizdeki olası yazım hatalarını ve bağlamsal nüansları dostça bir bildirim ve görsel alt çizgi ile sunar.
 4. **Otomatik Kelime Kasası (Active Vocabulary Deck):** Değiştirilen her deyim ve kelime, kasanızdaki `Vocabulary.md` dosyasına cümlenin bağlamı ve Türkçe notuyla birlikte otomatik tablo satırı olarak işlenir.
