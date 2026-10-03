@@ -45,7 +45,9 @@ var DEFAULT_SETTINGS = {
   targetLanguage: "English",
   highlightStyle: "decorations",
   highlightReplacedText: true,
-  highlightFlaggedNuances: true
+  highlightFlaggedNuances: true,
+  replacedHighlightColor: "#3b82f6",
+  nuanceHighlightColor: "#f59e0b"
 };
 var PROVIDER_DEFAULTS = {
   groq: {
@@ -145,10 +147,38 @@ var FluencyBridgeSettingTab = class extends import_obsidian.PluginSettingTab {
         await this.plugin.saveSettings();
       });
     });
+    new import_obsidian.Setting(containerEl).setName("\xC7evrilen \u0130fade Vurgu Rengi").setDesc("K\xF6\u015Feli parantezden d\xF6n\xFC\u015Ft\xFCr\xFClen ifadenin alt \xE7izgi ve arka plan rengi.").addColorPicker((color) => {
+      color.setValue(this.plugin.settings.replacedHighlightColor || DEFAULT_SETTINGS.replacedHighlightColor).onChange(async (val) => {
+        this.plugin.settings.replacedHighlightColor = val;
+        this.plugin.updateColors();
+        await this.plugin.saveSettings();
+      });
+    }).addExtraButton((btn) => {
+      btn.setIcon("reset").setTooltip("Varsay\u0131lan renge s\u0131f\u0131rla (#3b82f6)").onClick(async () => {
+        this.plugin.settings.replacedHighlightColor = DEFAULT_SETTINGS.replacedHighlightColor;
+        this.plugin.updateColors();
+        await this.plugin.saveSettings();
+        this.display();
+      });
+    });
     new import_obsidian.Setting(containerEl).setName("Uyar\u0131 & \u0130pucu Alan Kelimeleri \u0130\u015Faretle").setDesc("C\xFCmledeki yaz\u0131m hatalar\u0131 veya do\u011Fall\u0131k uyar\u0131s\u0131 alan kelimeleri dalgal\u0131 alt \xE7izgi ile i\u015Faretle (hover ile \xF6neri g\xF6r\xFCn\xFCr).").addToggle((toggle) => {
       toggle.setValue(this.plugin.settings.highlightFlaggedNuances).onChange(async (val) => {
         this.plugin.settings.highlightFlaggedNuances = val;
         await this.plugin.saveSettings();
+      });
+    });
+    new import_obsidian.Setting(containerEl).setName("Yaz\u0131m Hatas\u0131 & N\xFCans Vurgu Rengi").setDesc("C\xFCmledeki yaz\u0131m hatalar\u0131 ve do\u011Fall\u0131k uyar\u0131lar\u0131n\u0131n dalgal\u0131 alt \xE7izgi ve arka plan rengi.").addColorPicker((color) => {
+      color.setValue(this.plugin.settings.nuanceHighlightColor || DEFAULT_SETTINGS.nuanceHighlightColor).onChange(async (val) => {
+        this.plugin.settings.nuanceHighlightColor = val;
+        this.plugin.updateColors();
+        await this.plugin.saveSettings();
+      });
+    }).addExtraButton((btn) => {
+      btn.setIcon("reset").setTooltip("Varsay\u0131lan renge s\u0131f\u0131rla (#f59e0b)").onClick(async () => {
+        this.plugin.settings.nuanceHighlightColor = DEFAULT_SETTINGS.nuanceHighlightColor;
+        this.plugin.updateColors();
+        await this.plugin.saveSettings();
+        this.display();
       });
     });
     containerEl.createEl("h3", { text: "Kelime Kasas\u0131 & Uyar\u0131lar" });
@@ -780,6 +810,57 @@ var HighlightManager = class {
   }
 };
 
+// src/services/colorManager.ts
+var STYLE_ELEMENT_ID = "fluency-bridge-custom-colors";
+function hexToRgba(hex, alpha) {
+  let clean = (hex || "").trim().replace(/^#/, "");
+  if (clean.length === 3) {
+    clean = clean.split("").map((c) => c + c).join("");
+  }
+  if (clean.length !== 6) {
+    return hex;
+  }
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) {
+    return hex;
+  }
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+function applyColorStyles(settings) {
+  const replacedColor = settings.replacedHighlightColor || DEFAULT_SETTINGS.replacedHighlightColor;
+  const nuanceColor = settings.nuanceHighlightColor || DEFAULT_SETTINGS.nuanceHighlightColor;
+  const replacedLightBg = hexToRgba(replacedColor, 0.18);
+  const replacedDarkBg = hexToRgba(replacedColor, 0.25);
+  const nuanceLightBg = hexToRgba(nuanceColor, 0.18);
+  const nuanceDarkBg = hexToRgba(nuanceColor, 0.25);
+  let styleEl = document.getElementById(STYLE_ELEMENT_ID);
+  if (!styleEl) {
+    styleEl = document.createElement("style");
+    styleEl.id = STYLE_ELEMENT_ID;
+    document.head.appendChild(styleEl);
+  }
+  styleEl.textContent = `
+    body {
+      --fb-replaced-color: ${replacedColor};
+      --fb-replaced-bg: ${replacedLightBg};
+      --fb-nuance-color: ${nuanceColor};
+      --fb-nuance-bg: ${nuanceLightBg};
+    }
+    body.theme-dark {
+      --fb-replaced-bg: ${replacedDarkBg};
+      --fb-nuance-bg: ${nuanceDarkBg};
+    }
+  `;
+}
+function clearColorStyles() {
+  const styleEl = document.getElementById(STYLE_ELEMENT_ID);
+  if (styleEl) {
+    styleEl.remove();
+  }
+}
+
 // src/main.ts
 var FluencyBridgePlugin = class extends import_obsidian4.Plugin {
   settings = DEFAULT_SETTINGS;
@@ -788,6 +869,7 @@ var FluencyBridgePlugin = class extends import_obsidian4.Plugin {
   persistTimer = null;
   async onload() {
     await this.loadSettings();
+    applyColorStyles(this.settings);
     this.llmClient = new LLMClient(this.settings);
     this.vocabManager = new VocabularyManager(this.app, this.settings);
     this.registerEditorExtension([
@@ -851,6 +933,7 @@ var FluencyBridgePlugin = class extends import_obsidian4.Plugin {
       this.persistTimer = null;
       void this.saveData(this.settings);
     }
+    clearColorStyles();
     console.log("[Fluency Bridge] Eklenti devreden \xE7\u0131kar\u0131ld\u0131.");
   }
   async loadSettings() {
@@ -865,8 +948,12 @@ var FluencyBridgePlugin = class extends import_obsidian4.Plugin {
   }
   async saveSettings() {
     await this.saveData(this.settings);
+    applyColorStyles(this.settings);
     this.llmClient.updateSettings(this.settings);
     this.vocabManager.updateSettings(this.settings);
+  }
+  updateColors() {
+    applyColorStyles(this.settings);
   }
   /** Called by the editor extension on every change of a note's highlights. */
   rememberHighlights(path, highlights) {

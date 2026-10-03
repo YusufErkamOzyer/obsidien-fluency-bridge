@@ -156,12 +156,22 @@ Hepsi boyanmalı; biri boyanıp diğeri boyanmamışsa **hata var**.
 - Başka bir uygulamada (VS Code vb.) açılan not vurgusuz görünür; metin temizdir.
 - Model ipucu vermezse hata boyanmaz; boyama modelin döndürdüğü listeye bağlıdır.
 
+## P. Özelleştirilebilir Vurgu Renkleri (v0.2) ⭐
+
+- [ ] **P1 Canlı renk değişimi (Çevrilen İfade):** Ayarlar > Metin İçi Vurgulama altından *Çevrilen İfade Vurgu Rengi* yeşil (`#10b981`) seçilir. Açık nottaki çevrilmiş kelimenin alt çizgisi ve zemin rengi **sayfayı yenilemeden anında yeşil** olmalı.
+- [ ] **P2 Canlı renk değişimi (Hata / Nüans):** Ayarlar altından *Yazım Hatası & Nüans Vurgu Rengi* mor (`#8b5cf6`) veya kırmızı (`#ef4444`) seçilir. Cümledeki dalgalı hata çizgisi ve zemin rengi **anında yeni renge** bürünmeli.
+- [ ] **P3 Varsayılana sıfırla (Reset):** Renk seçicinin yanındaki sıfırlama ikonuna (dönel ok) tıklanır. Renk orijinal fabrika değerine (`#3b82f6` mavi veya `#f59e0b` kehribar) dönmeli ve editördeki vurgular hemen eski rengini almalı.
+- [ ] **P4 Koyu / Açık tema uyumu:** Obsidian ayarlarından Açık (Light) ve Koyu (Dark) temaya geçiş yapılır. Seçilen renklerin zemin opaklığı ve alt çizgi netliği her iki temada da okunabilir kalmalı.
+- [ ] **P5 Kalıcılık (Persistence):** Renkler özelleştirildikten sonra Obsidian yeniden başlatılır veya eklenti yeniden yüklenir. Seçilen özel renkler korunmalı.
+
 ---
 
-### Hızlı kontrol listesi (kritik 5)
+### Hızlı kontrol listesi (kritik 6)
 
 1. C1: iki hata da boyanıyor mu?
 2. I2: sekmeyi kapat-aç sonrası vurgular var mı?
 3. Metinde hiç `<mark>`/HTML yok mu?
 4. J1: hatayı düzeltince çizgi kalkıyor mu?
 5. K2: temizlenen vurgular geri gelmiyor mu?
+6. P1-P2: Ayarlardan renk seçildiğinde editördeki vurgular canlı güncelleniyor mu?
+
