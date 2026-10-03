@@ -517,6 +517,60 @@ function buildMark(spec) {
     suggestion: spec.suggestion
   });
 }
+function updateNuanceHighlight(iterFrom, iterTo, spec, tr) {
+  const suggestion = spec.suggestion;
+  let touched = false;
+  tr.changes.iterChanges((fromA, toA) => {
+    if (fromA <= iterTo && toA >= iterFrom) {
+      touched = true;
+    }
+  });
+  if (!touched) {
+    const f2 = tr.changes.mapPos(iterFrom, 1);
+    const t2 = tr.changes.mapPos(iterTo, -1);
+    if (t2 > f2) {
+      return { from: f2, to: t2 };
+    }
+    return null;
+  }
+  let f = tr.changes.mapPos(iterFrom, -1);
+  let t = tr.changes.mapPos(iterTo, 1);
+  if (t <= f) {
+    return null;
+  }
+  const rawText = tr.newDoc.sliceString(f, t);
+  if (!rawText.trim()) {
+    return null;
+  }
+  const leadingWsMatch = rawText.match(/^\s+/);
+  if (leadingWsMatch) {
+    f += leadingWsMatch[0].length;
+  }
+  const targetWordCount = suggestion ? suggestion.trim().split(/\s+/).filter(Boolean).length : 1;
+  const trimmedFromLeft = tr.newDoc.sliceString(f, t);
+  const wordPattern = new RegExp(
+    `^([\\p{L}\\p{N}_\\-\\x27\\u2019]+(?:\\s+[\\p{L}\\p{N}_\\-\\x27\\u2019]+){0,${Math.max(0, targetWordCount - 1)}})`,
+    "u"
+  );
+  const wordMatch = trimmedFromLeft.match(wordPattern);
+  if (wordMatch) {
+    t = f + wordMatch[1].length;
+  } else {
+    return null;
+  }
+  const currentText = tr.newDoc.sliceString(f, t);
+  if (suggestion) {
+    if (matchesSuggestion(currentText, suggestion)) {
+      return null;
+    }
+  } else {
+    const oldText = tr.startState.doc.sliceString(iterFrom, iterTo);
+    if (currentText !== oldText) {
+      return null;
+    }
+  }
+  return { from: f, to: t };
+}
 var fluencyHighlightField = import_state.StateField.define({
   create() {
     return import_view.Decoration.none;
@@ -529,13 +583,9 @@ var fluencyHighlightField = import_state.StateField.define({
       while (iter.value) {
         if (isNuance(iter.value)) {
           const spec = iter.value.spec;
-          const from = tr.changes.mapPos(iter.from, 1);
-          const to = tr.changes.mapPos(iter.to, -1);
-          if (to > from) {
-            const newText = tr.newDoc.sliceString(from, to);
-            const oldText = tr.startState.doc.sliceString(iter.from, iter.to);
-            const fixed = spec.suggestion ? matchesSuggestion(newText, spec.suggestion) : newText !== oldText;
-            if (!fixed) survivors.push(iter.value.range(from, to));
+          const updated = updateNuanceHighlight(iter.from, iter.to, spec, tr);
+          if (updated) {
+            survivors.push(iter.value.range(updated.from, updated.to));
           }
         }
         iter.next();
@@ -598,6 +648,9 @@ function resolveStoredHighlights(docText, stored) {
       from = best;
     }
     if (from < 0) continue;
+    if (h.type === "nuance" && h.suggestion && matchesSuggestion(h.text, h.suggestion)) {
+      continue;
+    }
     resolved.push({
       from,
       to: from + h.text.length,

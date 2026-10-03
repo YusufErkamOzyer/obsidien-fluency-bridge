@@ -48,6 +48,97 @@ function buildMark(spec: FluencyDecorationSpec) {
   });
 }
 
+export function updateNuanceHighlight(
+  iterFrom: number,
+  iterTo: number,
+  spec: MarkSpec,
+  tr: {
+    startState: EditorState;
+    newDoc: { sliceString: (from: number, to: number) => string };
+    changes: {
+      iterChanges: (f: (fromA: number, toA: number, fromB: number, toB: number, inserted: any) => void) => void;
+      mapPos: (pos: number, assoc?: number) => number;
+    };
+  }
+): { from: number; to: number } | null {
+  const suggestion = spec.suggestion;
+
+  let touched = false;
+  tr.changes.iterChanges((fromA, toA) => {
+    if (fromA <= iterTo && toA >= iterFrom) {
+      touched = true;
+    }
+  });
+
+  // If this highlight was not touched by the edit, map its positions safely
+  if (!touched) {
+    const f = tr.changes.mapPos(iterFrom, 1);
+    const t = tr.changes.mapPos(iterTo, -1);
+    if (t > f) {
+      return { from: f, to: t };
+    }
+    return null;
+  }
+
+  // Range was touched by user edit:
+  // Map positions with inclusive boundaries (-1 for start, 1 for end) to capture boundary typing
+  let f = tr.changes.mapPos(iterFrom, -1);
+  let t = tr.changes.mapPos(iterTo, 1);
+
+  // If the word was completely deleted (collapsed to zero or inverted length):
+  if (t <= f) {
+    return null;
+  }
+
+  const rawText = tr.newDoc.sliceString(f, t);
+  if (!rawText.trim()) {
+    // Only whitespace left -> word was completely deleted
+    return null;
+  }
+
+  // Trim leading whitespace (e.g., if typing at start added spaces)
+  const leadingWsMatch = rawText.match(/^\s+/);
+  if (leadingWsMatch) {
+    f += leadingWsMatch[0].length;
+  }
+
+  // Number of words expected in the correction (e.g. 1 for "achieve", 2 for "do research")
+  const targetWordCount = suggestion
+    ? suggestion.trim().split(/\s+/).filter(Boolean).length
+    : 1;
+
+  const trimmedFromLeft = tr.newDoc.sliceString(f, t);
+  const wordPattern = new RegExp(
+    `^([\\p{L}\\p{N}_\\-\\x27\\u2019]+(?:\\s+[\\p{L}\\p{N}_\\-\\x27\\u2019]+){0,${Math.max(0, targetWordCount - 1)}})`,
+    "u"
+  );
+  const wordMatch = trimmedFromLeft.match(wordPattern);
+  if (wordMatch) {
+    t = f + wordMatch[1].length;
+  } else {
+    // No valid word characters remaining
+    return null;
+  }
+
+  const currentText = tr.newDoc.sliceString(f, t);
+
+  // Check if current text now matches the suggested correction
+  if (suggestion) {
+    if (matchesSuggestion(currentText, suggestion)) {
+      // Correct form achieved! Drop highlight.
+      return null;
+    }
+  } else {
+    // Legacy highlight without suggestion: if text changed, drop it
+    const oldText = tr.startState.doc.sliceString(iterFrom, iterTo);
+    if (currentText !== oldText) {
+      return null;
+    }
+  }
+
+  return { from: f, to: t };
+}
+
 /**
  * CodeMirror 6 Editor Extension:
  * Applies visual styling and hover tooltips directly in the editor DOM without adding
@@ -62,25 +153,17 @@ export const fluencyHighlightField = StateField.define<DecorationSet>({
       const isNuance = (value: Decoration) =>
         ((value.spec as MarkSpec).class ?? "").includes("fb-nuance");
 
-      // Nuance (typo) highlights are re-anchored by hand so partial edits keep them alive:
-      //   - an edit inside / replacing the word keeps the highlight over the edited word,
-      //   - typing right before or after the word does not extend it,
-      //   - it is dropped only when the word now equals the suggested correction.
+      // Nuance (typo / nuance) highlights persist while editing until:
+      //   - either the word is completely deleted by the user,
+      //   - or the word matches the suggested correction.
       const survivors: Array<ReturnType<Decoration["range"]>> = [];
       const iter = decorations.iter();
       while (iter.value) {
         if (isNuance(iter.value)) {
           const spec = iter.value.spec as MarkSpec;
-          const from = tr.changes.mapPos(iter.from, 1);
-          const to = tr.changes.mapPos(iter.to, -1);
-
-          if (to > from) {
-            const newText = tr.newDoc.sliceString(from, to);
-            const oldText = tr.startState.doc.sliceString(iter.from, iter.to);
-            const fixed = spec.suggestion
-              ? matchesSuggestion(newText, spec.suggestion)
-              : newText !== oldText; // legacy highlights saved without a suggestion
-            if (!fixed) survivors.push(iter.value.range(from, to));
+          const updated = updateNuanceHighlight(iter.from, iter.to, spec, tr);
+          if (updated) {
+            survivors.push(iter.value.range(updated.from, updated.to));
           }
         }
         iter.next();
@@ -173,6 +256,13 @@ export function resolveStoredHighlights(
     }
 
     if (from < 0) continue;
+
+    // If it is a nuance highlight and the text already matches the suggested correction,
+    // the user fixed it (e.g. in another editor while closed), so do not restore it.
+    if (h.type === "nuance" && h.suggestion && matchesSuggestion(h.text, h.suggestion)) {
+      continue;
+    }
+
     resolved.push({
       from,
       to: from + h.text.length,
