@@ -1,6 +1,25 @@
 export type LLMProvider = "groq" | "gemini" | "openrouter" | "custom";
 
+export type HighlightStyle = "decorations" | "markdown" | "none";
+
+export interface FlaggedItem {
+  original: string;
+  suggestion: string;
+  reason: string;
+}
+
+/** A highlight persisted per note so it survives closing/reopening the note. */
+export interface StoredHighlight {
+  from: number;
+  to: number;
+  text: string; // exact text covered, used to re-locate the range if the note changed
+  type: "replaced" | "nuance";
+  tooltip: string;
+  suggestion?: string; // correct form; nuance highlight clears once the word equals it
+}
+
 export interface FluencyBridgeSettings {
+  savedHighlights: Record<string, StoredHighlight[]>;
   provider: LLMProvider;
   apiKey: string;
   model: string;
@@ -8,11 +27,16 @@ export interface FluencyBridgeSettings {
   vocabularyPath: string;
   autoLogVocabulary: boolean;
   enableSlangAlerts: boolean;
+  enableNuanceTips: boolean;
   nativeLanguage: string;
   targetLanguage: string;
+  highlightStyle: HighlightStyle;
+  highlightReplacedText: boolean;
+  highlightFlaggedNuances: boolean;
 }
 
 export const DEFAULT_SETTINGS: FluencyBridgeSettings = {
+  savedHighlights: {},
   provider: "groq",
   apiKey: "",
   model: "llama-3.3-70b-versatile",
@@ -20,8 +44,12 @@ export const DEFAULT_SETTINGS: FluencyBridgeSettings = {
   vocabularyPath: "Vocabulary.md",
   autoLogVocabulary: true,
   enableSlangAlerts: true,
+  enableNuanceTips: true,
   nativeLanguage: "Turkish",
   targetLanguage: "English",
+  highlightStyle: "decorations",
+  highlightReplacedText: true,
+  highlightFlaggedNuances: true,
 };
 
 export const PROVIDER_DEFAULTS: Record<
@@ -61,7 +89,10 @@ export interface ExtractedTarget {
 
 export interface TranslationResult {
   replacement: string;
+  feedback?: string | null;
   warning?: string | null;
+  flaggedItem?: FlaggedItem | null; // legacy single-item form
+  flaggedItems?: FlaggedItem[];
   vocabItem?: {
     term: string;
     definition: string;

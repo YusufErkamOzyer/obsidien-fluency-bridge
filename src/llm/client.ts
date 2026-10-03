@@ -1,4 +1,4 @@
-import { FluencyBridgeSettings, PROVIDER_DEFAULTS, TranslationResult } from "../types";
+import { FlaggedItem, FluencyBridgeSettings, PROVIDER_DEFAULTS, TranslationResult } from "../types";
 
 export class LLMClient {
   private settings: FluencyBridgeSettings;
@@ -102,15 +102,28 @@ Your goals:
 1. Provide the most natural, idiomatic, and contextually accurate ${this.settings.targetLanguage} replacement that fits seamlessly into the sentence's grammar, rhythm, and tone.
 2. CONSTRUCTIVE FLUENCY & NUANCE COACHING:
    - Review the surrounding sentence for any typos (misspellings), unnatural collocations, or phrasing that could be expressed more clearly or idiomatically.
-   - If there is a typo (e.g. "hearth" instead of "heart") or a phrase that would sound significantly more natural (e.g. "do research" instead of "make research"), provide a friendly, concise, and constructive tip in Turkish in the "feedback" field (e.g. "İpucu: Cümledeki 'make research' yerine 'do research' kullanımı daha doğaldır.").
+   - If there are typos or phrases that would sound significantly more natural (e.g. "hearth" instead of "heart", "make research" instead of "do research"):
+     a) Provide a friendly, concise, and constructive tip in Turkish in the "feedback" field mentioning ALL issues found (e.g. "İpucu: 'hearth' yerine 'heart'; 'make research' yerine 'do research' kullanımı daha doğaldır.").
+     b) Populate the "flaggedItems" ARRAY with ONE entry for EVERY separate issue in the sentence. Never stop at the first one; if the sentence has two typos, return two entries. Each entry has:
+        - "original": the EXACT substring as it appears in the user's sentence, copied character-for-character (e.g. "hearth" or "make research"). Keep it as short as possible (usually a single word) so it can be located precisely.
+        - "suggestion": the improved target language word or phrase (e.g. "heart" or "do research")
+        - "reason": concise reason in Turkish (e.g. "Yazım hatası" or "Doğal eşdizim")
+     c) Do NOT flag the bracketed expression itself; it is being replaced.
+   - If the sentence is already completely natural and error-free, set "feedback" to null and "flaggedItems" to [].
    - Do NOT lecture or moralize about tone or intent. Focus purely on constructive writing polish, clarity, and linguistic nuances.
-   - If the sentence is already completely natural and error-free, set "feedback" to null.
 3. Extract the key vocabulary item (word or collocation phrase) to add to the user's active vocabulary list.
 
 You MUST respond strictly with valid JSON conforming to this schema (no markdown fences, no extra text):
 {
   "replacement": "exact replacement string for inside or including the brackets",
   "feedback": "Optional concise, constructive tip in Turkish about typos, phrasing improvements, or nuance, or null",
+  "flaggedItems": [
+    {
+      "original": "exact word or phrase from the sentence that has a typo or unnatural usage",
+      "suggestion": "improved word or phrase",
+      "reason": "kısa açıklama (örn: Yazım hatası veya Doğal eşdizim)"
+    }
+  ],
   "vocabItem": {
     "term": "the key target language word or idiom",
     "definition": "Türkçe anlamı ve kullanım notu",
@@ -175,6 +188,29 @@ Provide the natural replacement to substitute the bracketed text directly.`;
     }
 
     parsed.feedback = parsed.feedback || parsed.warning || null;
+
+    // Accept both the new array form and the legacy single-object form.
+    const rawItems: unknown[] = [
+      ...(Array.isArray(parsed.flaggedItems) ? parsed.flaggedItems : []),
+      ...(parsed.flaggedItem ? [parsed.flaggedItem] : []),
+    ];
+    const seen = new Set<string>();
+    parsed.flaggedItems = [];
+    for (const raw of rawItems) {
+      if (!raw || typeof raw !== "object") continue;
+      const item = raw as Partial<FlaggedItem>;
+      const original = typeof item.original === "string" ? item.original.trim() : "";
+      if (!original || !item.suggestion) continue;
+      const key = original.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      parsed.flaggedItems.push({
+        original,
+        suggestion: String(item.suggestion),
+        reason: item.reason ? String(item.reason) : "",
+      });
+    }
+    parsed.flaggedItem = parsed.flaggedItems[0] ?? null;
     return parsed;
   }
 }

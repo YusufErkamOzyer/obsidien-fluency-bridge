@@ -31,3 +31,50 @@
   color: var(--text-on-accent);
   margin-right: 6px;
 }
+
+/* ==========================================================================
+   v0.2 Highlight Styles (Düzeltilen & İpucu Verilen Kelimeler)
+   ========================================================================== */
+
+/* Ortak Vurgu Temeli */
+.fb-highlight {
+  display: inline;
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin: 0 1px;
+  cursor: help;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  font-weight: inherit;
+  color: inherit;
+}
+
+/* 1. Düzeltilen / Çevrilen İfade (Replaced In-flow Expression) - Sakin Mavi / Turkuaz */
+.fb-replaced {
+  background-color: rgba(59, 130, 246, 0.18);
+  border-bottom: 2px solid #3b82f6;
+}
+
+.theme-dark .fb-replaced {
+  background-color: rgba(96, 165, 250, 0.24);
+  border-bottom: 2px solid #60a5fa;
+}
+
+/* 2. Cümle İçi Hata / Nüans Uyarısı (Flagged Typos & Nuances) - Dalgalı Kehribar/Sarı */
+.fb-nuance {
+  background-color: rgba(245, 158, 11, 0.18);
+  text-decoration: underline wavy #d97706;
+  text-underline-offset: 3px;
+  border-bottom: none;
+}
+
+.theme-dark .fb-nuance {
+  background-color: rgba(251, 191, 36, 0.22);
+  text-decoration: underline wavy #fbbf24;
+  text-underline-offset: 3px;
+  border-bottom: none;
+}
+
+/* Hover Etkisi */
+.fb-highlight:hover {
+  filter: brightness(1.12);
+}
