@@ -471,33 +471,50 @@ var import_view = require("@codemirror/view");
 var import_obsidian3 = require("obsidian");
 var addFluencyDecorations = import_state.StateEffect.define();
 var clearFluencyDecorations = import_state.StateEffect.define();
+function normalizeForMatch(text) {
+  return (text || "").trim().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "").replace(/\s+/g, " ").toLowerCase();
+}
+function matchesSuggestion(text, suggestion) {
+  const target = normalizeForMatch(suggestion ?? "");
+  return target.length > 0 && normalizeForMatch(text) === target;
+}
+function buildMark(spec) {
+  return import_view.Decoration.mark({
+    class: `fb-highlight fb-${spec.type}`,
+    attributes: {
+      title: spec.tooltip
+    },
+    suggestion: spec.suggestion
+  });
+}
 var fluencyHighlightField = import_state.StateField.define({
   create() {
     return import_view.Decoration.none;
   },
   update(decorations, tr) {
     if (tr.docChanged) {
-      const touched = [];
-      tr.changes.iterChangedRanges((fromA, toA) => touched.push([fromA, toA]));
-      decorations = decorations.update({
-        filter: (from, to, value) => {
-          const cls = value.spec.class ?? "";
-          if (!cls.includes("fb-nuance")) return true;
-          return !touched.some(([a, b]) => a < to && b > from);
+      const isNuance = (value) => (value.spec.class ?? "").includes("fb-nuance");
+      const survivors = [];
+      const iter = decorations.iter();
+      while (iter.value) {
+        if (isNuance(iter.value)) {
+          const spec = iter.value.spec;
+          const from = tr.changes.mapPos(iter.from, 1);
+          const to = tr.changes.mapPos(iter.to, -1);
+          if (to > from) {
+            const newText = tr.newDoc.sliceString(from, to);
+            const oldText = tr.startState.doc.sliceString(iter.from, iter.to);
+            const fixed = spec.suggestion ? matchesSuggestion(newText, spec.suggestion) : newText !== oldText;
+            if (!fixed) survivors.push(iter.value.range(from, to));
+          }
         }
-      });
+        iter.next();
+      }
+      decorations = decorations.update({ filter: (_from, _to, value) => !isNuance(value) }).map(tr.changes).update({ add: survivors, sort: true });
     }
-    decorations = decorations.map(tr.changes);
     for (const effect of tr.effects) {
       if (effect.is(addFluencyDecorations)) {
-        const marks = effect.value.filter((spec) => spec.to > spec.from).map(
-          (spec) => import_view.Decoration.mark({
-            class: `fb-highlight fb-${spec.type}`,
-            attributes: {
-              title: spec.tooltip
-            }
-          }).range(spec.from, spec.to)
-        );
+        const marks = effect.value.filter((spec) => spec.to > spec.from).map((spec) => buildMark(spec).range(spec.from, spec.to));
         decorations = decorations.update({
           add: marks,
           sort: true
@@ -522,7 +539,8 @@ function extractStoredHighlights(state) {
       to: iter.to,
       text: state.doc.sliceString(iter.from, iter.to),
       type: spec.class?.includes("fb-nuance") ? "nuance" : "replaced",
-      tooltip: spec.attributes?.title ?? ""
+      tooltip: spec.attributes?.title ?? "",
+      suggestion: spec.suggestion
     });
     iter.next();
   }
@@ -554,7 +572,8 @@ function resolveStoredHighlights(docText, stored) {
       from,
       to: from + h.text.length,
       type: h.type,
-      tooltip: h.tooltip
+      tooltip: h.tooltip,
+      suggestion: h.suggestion
     });
   }
   return resolved;
@@ -661,7 +680,8 @@ var HighlightManager = class {
           from: lineStartOffset + m.start,
           to: lineStartOffset + m.end,
           type: "nuance",
-          tooltip
+          tooltip,
+          suggestion: item.suggestion
         });
       }
     }

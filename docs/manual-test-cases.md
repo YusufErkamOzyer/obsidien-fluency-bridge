@@ -106,7 +106,13 @@ Hepsi boyanmalı; biri boyanıp diğeri boyanmamışsa **hata var**.
 
 ## J. Düzenleme sırasında davranış
 
-- [ ] **J1** C1 sonrası dalgalı `hearth` kelimesini kendiniz `heart` yapın → dalgalı çizgi **kalkmalı**.
+- [ ] **J1** C1 sonrası `hearth` kelimesinin **sonundaki h'yi silin** (`heart` olur) → dalgalı çizgi **kalkmalı**.
+- [ ] **J1b** `hearth` içinden **ortadan bir harf silin** (`herth`) → çizgi **kalmaya devam etmeli** (hâlâ yanlış).
+- [ ] **J1c** `herth` kelimesine harfi geri yazıp `heart` yapın → çizgi **kalkmalı**.
+- [ ] **J1d** `hearth` kelimesini tamamen silip `hert` yazın → yeni kelimenin altında çizgi **kalmalı**; `heart` yazınca kalkmalı.
+- [ ] **J1e** `Heart` / `HEART` (büyük harf) yazın → doğru sayılıp çizgi **kalkmalı**.
+- [ ] **J1f** C4'te `make research` içindeki `make` → `do` yapın → çizgi kalkmalı; `take` yaparsanız kalmalı.
+- [ ] **J1g** Kelimenin hemen önüne/sonuna harf yazın (boşluksuz) → çizgi genişlememeli, bozulmamalı.
 - [ ] **J2** Mavi ifadenin sonuna harf ekleyin (`conduct researches`) → vurgu genişlemez, bozulmaz.
 - [ ] **J3** Mavi ifadenin ortasına imleç koyup yazın → editör normal davranmalı, HTML görünmemeli.
 - [ ] **J4** Vurgulu kelimeyi tamamen silin → vurgu kaybolur, hata vermez.

@@ -15,6 +15,7 @@ export interface StoredHighlight {
   text: string; // exact text covered, used to re-locate the range if the note changed
   type: "replaced" | "nuance";
   tooltip: string;
+  suggestion?: string; // correct form; nuance highlight clears once the word equals it
 }
 
 export interface FluencyBridgeSettings {

@@ -14,10 +14,39 @@ export interface FluencyDecorationSpec {
   to: number;
   type: "replaced" | "nuance";
   tooltip: string;
+  /** For nuance highlights: the correct form. The highlight is removed once the word equals it. */
+  suggestion?: string;
 }
 
 export const addFluencyDecorations = StateEffect.define<FluencyDecorationSpec[]>();
 export const clearFluencyDecorations = StateEffect.define<void>();
+
+/** Case/space/punctuation-insensitive form used to compare a word with its suggested correction. */
+export function normalizeForMatch(text: string): string {
+  return (text || "")
+    .trim()
+    .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+/** True when the edited text now equals the suggested correction. */
+export function matchesSuggestion(text: string, suggestion?: string): boolean {
+  const target = normalizeForMatch(suggestion ?? "");
+  return target.length > 0 && normalizeForMatch(text) === target;
+}
+
+type MarkSpec = { class?: string; attributes?: { title?: string }; suggestion?: string };
+
+function buildMark(spec: FluencyDecorationSpec) {
+  return Decoration.mark({
+    class: `fb-highlight fb-${spec.type}`,
+    attributes: {
+      title: spec.tooltip,
+    },
+    suggestion: spec.suggestion,
+  });
+}
 
 /**
  * CodeMirror 6 Editor Extension:
@@ -29,34 +58,45 @@ export const fluencyHighlightField = StateField.define<DecorationSet>({
     return Decoration.none;
   },
   update(decorations, tr) {
-    // A flagged word the user has edited (typo fixed or changed) must stop being marked.
     if (tr.docChanged) {
-      const touched: Array<[number, number]> = [];
-      tr.changes.iterChangedRanges((fromA, toA) => touched.push([fromA, toA]));
-      decorations = decorations.update({
-        filter: (from, to, value) => {
-          const cls = (value.spec as { class?: string }).class ?? "";
-          if (!cls.includes("fb-nuance")) return true;
-          return !touched.some(([a, b]) => a < to && b > from);
-        },
-      });
-    }
+      const isNuance = (value: Decoration) =>
+        ((value.spec as MarkSpec).class ?? "").includes("fb-nuance");
 
-    // Automatically adjust ranges as user types or modifies text
-    decorations = decorations.map(tr.changes);
+      // Nuance (typo) highlights are re-anchored by hand so partial edits keep them alive:
+      //   - an edit inside / replacing the word keeps the highlight over the edited word,
+      //   - typing right before or after the word does not extend it,
+      //   - it is dropped only when the word now equals the suggested correction.
+      const survivors: Array<ReturnType<Decoration["range"]>> = [];
+      const iter = decorations.iter();
+      while (iter.value) {
+        if (isNuance(iter.value)) {
+          const spec = iter.value.spec as MarkSpec;
+          const from = tr.changes.mapPos(iter.from, 1);
+          const to = tr.changes.mapPos(iter.to, -1);
+
+          if (to > from) {
+            const newText = tr.newDoc.sliceString(from, to);
+            const oldText = tr.startState.doc.sliceString(iter.from, iter.to);
+            const fixed = spec.suggestion
+              ? matchesSuggestion(newText, spec.suggestion)
+              : newText !== oldText; // legacy highlights saved without a suggestion
+            if (!fixed) survivors.push(iter.value.range(from, to));
+          }
+        }
+        iter.next();
+      }
+
+      decorations = decorations
+        .update({ filter: (_from, _to, value) => !isNuance(value) })
+        .map(tr.changes)
+        .update({ add: survivors, sort: true });
+    }
 
     for (const effect of tr.effects) {
       if (effect.is(addFluencyDecorations)) {
         const marks = effect.value
           .filter((spec) => spec.to > spec.from)
-          .map((spec) =>
-            Decoration.mark({
-              class: `fb-highlight fb-${spec.type}`,
-              attributes: {
-                title: spec.tooltip,
-              },
-            }).range(spec.from, spec.to)
-          );
+          .map((spec) => buildMark(spec).range(spec.from, spec.to));
 
         decorations = decorations.update({
           add: marks,
@@ -82,13 +122,18 @@ export function extractStoredHighlights(state: EditorState): StoredHighlight[] {
 
   const iter = set.iter();
   while (iter.value) {
-    const spec = iter.value.spec as { class?: string; attributes?: { title?: string } };
+    const spec = iter.value.spec as {
+      class?: string;
+      attributes?: { title?: string };
+      suggestion?: string;
+    };
     out.push({
       from: iter.from,
       to: iter.to,
       text: state.doc.sliceString(iter.from, iter.to),
       type: spec.class?.includes("fb-nuance") ? "nuance" : "replaced",
       tooltip: spec.attributes?.title ?? "",
+      suggestion: spec.suggestion,
     });
     iter.next();
   }
@@ -133,6 +178,7 @@ export function resolveStoredHighlights(
       to: from + h.text.length,
       type: h.type,
       tooltip: h.tooltip,
+      suggestion: h.suggestion,
     });
   }
 
@@ -288,6 +334,7 @@ export class HighlightManager {
           to: lineStartOffset + m.end,
           type: "nuance",
           tooltip,
+          suggestion: item.suggestion,
         });
       }
     }
