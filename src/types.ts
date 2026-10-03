@@ -33,6 +33,8 @@ export interface FluencyBridgeSettings {
   highlightStyle: HighlightStyle;
   highlightReplacedText: boolean;
   highlightFlaggedNuances: boolean;
+  replacedHighlightColor: string;
+  nuanceHighlightColor: string;
 }
 
 export const DEFAULT_SETTINGS: FluencyBridgeSettings = {
@@ -50,6 +52,8 @@ export const DEFAULT_SETTINGS: FluencyBridgeSettings = {
   highlightStyle: "decorations",
   highlightReplacedText: true,
   highlightFlaggedNuances: true,
+  replacedHighlightColor: "#3b82f6",
+  nuanceHighlightColor: "#f59e0b",
 };
 
 export const PROVIDER_DEFAULTS: Record<

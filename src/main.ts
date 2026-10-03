@@ -16,6 +16,7 @@ import {
   fluencyHighlightField,
   HighlightManager,
 } from "./services/highlightManager";
+import { applyColorStyles, clearColorStyles } from "./services/colorManager";
 
 export default class FluencyBridgePlugin extends Plugin {
   settings: FluencyBridgeSettings = DEFAULT_SETTINGS;
@@ -26,6 +27,8 @@ export default class FluencyBridgePlugin extends Plugin {
 
   async onload() {
     await this.loadSettings();
+
+    applyColorStyles(this.settings);
 
     this.llmClient = new LLMClient(this.settings);
     this.vocabManager = new VocabularyManager(this.app, this.settings);
@@ -106,6 +109,7 @@ export default class FluencyBridgePlugin extends Plugin {
       this.persistTimer = null;
       void this.saveData(this.settings);
     }
+    clearColorStyles();
     console.log("[Fluency Bridge] Eklenti devreden çıkarıldı.");
   }
 
@@ -123,8 +127,13 @@ export default class FluencyBridgePlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+    applyColorStyles(this.settings);
     this.llmClient.updateSettings(this.settings);
     this.vocabManager.updateSettings(this.settings);
+  }
+
+  updateColors() {
+    applyColorStyles(this.settings);
   }
 
   /** Called by the editor extension on every change of a note's highlights. */

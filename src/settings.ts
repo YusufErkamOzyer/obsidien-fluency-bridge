@@ -1,6 +1,6 @@
 import { App, PluginSettingTab, Setting, Notice } from "obsidian";
 import FluencyBridgePlugin from "./main";
-import { HighlightStyle, LLMProvider, PROVIDER_DEFAULTS } from "./types";
+import { DEFAULT_SETTINGS, HighlightStyle, LLMProvider, PROVIDER_DEFAULTS } from "./types";
 
 export class FluencyBridgeSettingTab extends PluginSettingTab {
   plugin: FluencyBridgePlugin;
@@ -145,6 +145,31 @@ export class FluencyBridgeSettingTab extends PluginSettingTab {
           });
       });
 
+    // 7b. Replaced Highlight Color
+    new Setting(containerEl)
+      .setName("Çevrilen İfade Vurgu Rengi")
+      .setDesc("Köşeli parantezden dönüştürülen ifadenin alt çizgi ve arka plan rengi.")
+      .addColorPicker((color) => {
+        color
+          .setValue(this.plugin.settings.replacedHighlightColor || DEFAULT_SETTINGS.replacedHighlightColor)
+          .onChange(async (val) => {
+            this.plugin.settings.replacedHighlightColor = val;
+            this.plugin.updateColors();
+            await this.plugin.saveSettings();
+          });
+      })
+      .addExtraButton((btn) => {
+        btn
+          .setIcon("reset")
+          .setTooltip("Varsayılan renge sıfırla (#3b82f6)")
+          .onClick(async () => {
+            this.plugin.settings.replacedHighlightColor = DEFAULT_SETTINGS.replacedHighlightColor;
+            this.plugin.updateColors();
+            await this.plugin.saveSettings();
+            this.display();
+          });
+      });
+
     // 8. Highlight Flagged Nuances
     new Setting(containerEl)
       .setName("Uyarı & İpucu Alan Kelimeleri İşaretle")
@@ -155,6 +180,31 @@ export class FluencyBridgeSettingTab extends PluginSettingTab {
           .onChange(async (val) => {
             this.plugin.settings.highlightFlaggedNuances = val;
             await this.plugin.saveSettings();
+          });
+      });
+
+    // 8b. Nuance Highlight Color
+    new Setting(containerEl)
+      .setName("Yazım Hatası & Nüans Vurgu Rengi")
+      .setDesc("Cümledeki yazım hataları ve doğallık uyarılarının dalgalı alt çizgi ve arka plan rengi.")
+      .addColorPicker((color) => {
+        color
+          .setValue(this.plugin.settings.nuanceHighlightColor || DEFAULT_SETTINGS.nuanceHighlightColor)
+          .onChange(async (val) => {
+            this.plugin.settings.nuanceHighlightColor = val;
+            this.plugin.updateColors();
+            await this.plugin.saveSettings();
+          });
+      })
+      .addExtraButton((btn) => {
+        btn
+          .setIcon("reset")
+          .setTooltip("Varsayılan renge sıfırla (#f59e0b)")
+          .onClick(async () => {
+            this.plugin.settings.nuanceHighlightColor = DEFAULT_SETTINGS.nuanceHighlightColor;
+            this.plugin.updateColors();
+            await this.plugin.saveSettings();
+            this.display();
           });
       });
 
